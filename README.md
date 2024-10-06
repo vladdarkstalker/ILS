@@ -12,8 +12,6 @@ LearnSys is a Django-based web application for managing educational courses, stu
   - [Project Directory (`iis`)](#project-directory-iis)
   - [Application Directory (`learnsys`)](#application-directory-learnsys)
   - [Templates Directory](#templates-directory)
-- [License](#license)
-- [Contact](#contact)
 
 ## Features
 
