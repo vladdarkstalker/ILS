@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ course.name }}{% endblock %}
+
+{% block content %}
+<h2>{{ course.name }}</h2>
+<p>{{ course.description }}</p>
+
+<h3>Темы курса</h3>
+{% if topics %}
+    <ul class="list-group mb-4">
+        {% for topic in topics %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <a href="{% url 'learnsys:topic_detail' topic.id %}">{{ topic.name }}</a>
+                {% if is_instructor %}
+                    <div>
+                        <a href="{% url 'learnsys:topic_edit' topic.id %}" class="btn btn-sm btn-warning">Редактировать</a>
+                        <a href="{% url 'learnsys:topic_delete' topic.id %}" class="btn btn-sm btn-danger">Удалить</a>
+                    </div>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>Темы не найдены.</p>
+{% endif %}
+
+{% if is_instructor %}
+    <a href="{% url 'learnsys:topic_add' course.id %}" class="btn btn-primary">Добавить тему</a>
+{% endif %}
+
+{% if is_instructor %}
+    <a href="{% url 'learnsys:instructor_dashboard' %}" class="btn btn-secondary">Назад к списку курсов</a>
+{% endif %}
+
+{% if is_student %}
+    <a href="{% url 'learnsys:student_dashboard' %}" class="btn btn-secondary">Назад к списку курсов</a>
+{% endif %}
+
+{% endblock %}

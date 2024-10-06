@@ -1,0 +1,60 @@
+<!-- templates/topics/topic_detail.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}{{ topic.name }}{% endblock %}
+
+{% block content %}
+<h2>{{ topic.name }}</h2>
+
+{% for content in contents %}
+    <div class="content-item mb-4">
+        <!-- Отладочная информация -->
+        <p><strong>Тип контента:</strong> {{ content.get_content_type_display }}</p>
+        {% if content.content_type == 'text' %}
+            <p>{{ content.text_content|linebreaks }}</p>
+        {% else %}
+            {% if content.content_type == 'image' %}
+                <img src="{{ content.content.url }}" class="img-fluid" alt="Изображение">
+            {% elif content.content_type == 'video' %}
+                <video controls class="w-100">
+                    <source src="{{ content.content.url }}" type="video/mp4">
+                    Ваш браузер не поддерживает видео.
+                </video>
+            {% elif content.content_type == 'audio' %}
+                <audio controls>
+                    <source src="{{ content.content.url }}" type="audio/mpeg">
+                    Ваш браузер не поддерживает аудио.
+                </audio>
+            {% else %}
+                <a href="{{ content.content.url }}" class="btn btn-primary" target="_blank">Скачать файл</a>
+            {% endif %}
+        {% endif %}
+
+        {% if is_instructor %}
+            <!-- Кнопка удаления контента -->
+            <form method="post" action="{% url 'learnsys:topiccontent_delete' content.id %}" class="mt-2" onsubmit="return confirm('Вы уверены, что хотите удалить этот материал?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm">Удалить материал</button>
+            </form>
+        {% endif %}
+    </div>
+{% empty %}
+    <p>Материалов для отображения нет.</p>
+{% endfor %}
+
+{% if is_student %}
+    <!-- Ссылка на прохождение теста -->
+    {% if topic.tests.exists %}
+        <a href="{% url 'learnsys:test_detail' topic.tests.first.id %}" class="btn btn-primary">Пройти тест</a>
+    {% endif %}
+{% endif %}
+
+{% if is_instructor %}
+    <a href="{% url 'learnsys:test_list' topic_id=topic.id %}" class="btn btn-info">Список тестов</a>
+    <a href="{% url 'learnsys:test_create' topic_id=topic.id %}" class="btn btn-success">Создать тест</a>
+    <a href="{% url 'learnsys:topiccontent_add' topic.id %}" class="btn btn-primary">Добавить материал</a>
+{% endif %}
+
+<a href="{% url 'learnsys:course_detail' topic.course.id %}" class="btn btn-secondary">Назад к курсу</a>
+{% endblock %}

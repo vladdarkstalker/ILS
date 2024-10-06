@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ view.action }} группу{% endblock %}
+
+{% block content %}
+<h2>{{ view.action }} группу</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    
+    <div class="form-group">
+        {{ form.name.label_tag }}
+        {{ form.name }}
+        {{ form.name.errors }}
+    </div>
+
+    <div class="form-group">
+        {{ form.courses.label_tag }}
+        {{ form.courses }}
+        {{ form.courses.errors }}
+    </div>
+
+    <button type="submit" class="btn btn-primary">{{ view.action }}</button>
+    <a href="{% url 'learnsys:group_list' %}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}

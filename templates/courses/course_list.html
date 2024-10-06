@@ -1,0 +1,30 @@
+<!-- templates/groups/group_list.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Список групп{% endblock %}
+
+{% block content %}
+<h2>Список групп</h2>
+
+{% if is_instructor %}
+    <a href="{% url 'learnsys:group_create' %}" class="btn btn-success mb-3">Создать группу</a>
+{% endif %}
+
+<ul class="list-group">
+    {% for group in groups %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ group.name }}
+            <div>
+                <a href="{% url 'learnsys:group_detail' pk=group.id %}" class="btn btn-primary btn-sm">Просмотр</a>
+                {% if is_instructor %}
+                    <a href="{% url 'learnsys:group_edit' pk=group.id %}" class="btn btn-warning btn-sm">Редактировать</a>
+                    <a href="{% url 'learnsys:group_delete' pk=group.id %}" class="btn btn-danger btn-sm">Удалить</a>
+                {% endif %}
+            </div>
+        </li>
+    {% empty %}
+        <li class="list-group-item">Группы отсутствуют.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,38 @@
+<!-- templates/tests/testitem_form.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Добавить вопрос{% endblock %}
+
+{% block content %}
+<h2>Добавить вопрос к тесту "{{ test.title }}"</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="form-group">
+        {{ form.question_type.label_tag }}
+        {{ form.question_type }}
+        {{ form.question_type.errors }}
+    </div>
+    <div class="form-group">
+        {{ form.content.label_tag }}
+        {{ form.content }}
+        {{ form.content.errors }}
+    </div>
+    <div class="form-group">
+        {{ form.correct_text_answer.label_tag }}
+        {{ form.correct_text_answer }}
+        {{ form.correct_text_answer.errors }}
+    </div>
+    <div class="form-group">
+        {{ form.order_index.label_tag }}
+        {{ form.order_index }}
+        {{ form.order_index.errors }}
+    </div>
+    <button type="submit" class="btn btn-primary">Добавить вопрос</button>
+</form>
+
+<hr>
+
+<a href="{% url 'learnsys:test_detail' pk=test.id %}" class="btn btn-secondary">Перейти к тесту</a>
+{% endblock %}

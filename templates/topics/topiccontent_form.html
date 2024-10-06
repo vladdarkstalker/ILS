@@ -1,0 +1,57 @@
+<!-- templates/topics/topiccontent_form.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}{% if form.instance.pk %}Редактировать материал{% else %}Добавить материал{% endif %}{% endblock %}
+
+{% block content %}
+<h2>{% if form.instance.pk %}Редактировать материал{% else %}Добавить материал{% endif %}</h2>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="form-group">
+        {{ form.content_type.label_tag }} {{ form.content_type }}
+    </div>
+
+    <div class="form-group" id="text_content_field">
+        {{ form.text_content.label_tag }} {{ form.text_content }}
+        {{ form.text_content.errors }}
+    </div>
+
+    <div class="form-group" id="content_field">
+        {{ form.content.label_tag }} {{ form.content }}
+        {{ form.content.errors }}
+    </div>
+
+    <div class="form-group">
+        {{ form.order_index.label_tag }} {{ form.order_index }}
+        {{ form.order_index.errors }}
+    </div>
+
+    <button type="submit" class="btn btn-success">{% if form.instance.pk %}Сохранить{% else %}Добавить{% endif %}</button>
+    <a href="{% url 'learnsys:topic_detail' topic.id %}" class="btn btn-secondary">Отмена</a>
+</form>
+
+<script>
+    function updateContentFields() {
+        var contentType = document.getElementById('id_content_type').value;
+        var textContentField = document.getElementById('text_content_field');
+        var contentField = document.getElementById('content_field');
+
+        if (contentType === 'text') {
+            textContentField.style.display = 'block';
+            contentField.style.display = 'none';
+        } else {
+            textContentField.style.display = 'none';
+            contentField.style.display = 'block';
+        }
+    }
+
+    document.getElementById('id_content_type').addEventListener('change', updateContentFields);
+
+    // Вызываем функцию при загрузке страницы
+    updateContentFields();
+</script>
+{% endblock %}

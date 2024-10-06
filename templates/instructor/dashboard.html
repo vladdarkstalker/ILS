@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}Дашборд преподавателя{% endblock %}
+
+{% block content %}
+<h2>Добро пожаловать, {{ user.get_full_name }}!</h2>
+
+<h3>Ваши курсы</h3>
+{% if courses %}
+    <div class="row">
+        {% for course in courses %}
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ course.name }}</h5>
+                        <p class="card-text">{{ course.description|truncatewords:20 }}</p>
+                        <a href="{% url 'learnsys:course_detail' course.id %}" class="btn btn-primary">Управлять курсом</a>
+                        <!-- Форма для удаления курса -->
+                        <form action="{% url 'learnsys:course_delete' course.id %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger ml-2" onclick="return confirm('Вы уверены, что хотите удалить этот курс?');">Удалить курс</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>У вас пока нет созданных курсов.</p>
+{% endif %}
+<!-- Кнопка для создания нового курса -->
+<a href="{% url 'learnsys:course_create' %}" class="btn btn-success">Создать новый курс</a>
+
+<!-- Раздел для списка учебных групп -->
+<h3 class="mt-5">Ваши группы</h3>
+{% if groups %}
+    <div class="row">
+        {% for group in groups %}
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <a href="{% url 'learnsys:group_detail' group.id %}">{{ group.name }}</a>
+                        </h5>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>У вас пока нет созданных групп.</p>
+{% endif %}
+
+{% endblock %}

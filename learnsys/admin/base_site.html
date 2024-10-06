@@ -1,0 +1,21 @@
+{% extends "admin/base.html" %}
+
+{% block branding %}
+    <h1 id="site-name"><a href="{% url 'admin:index' %}">{% trans 'Администрирование' %}</a></h1>
+{% endblock %}
+
+{% block nav-global %}
+    <ul class="nav navbar-nav navbar-right">
+        <li>
+            <a href="{% url 'welcome' %}" class="view-site" target="_blank">{% trans 'View site' %}</a>
+        </li>
+        {% if user.is_active and user.is_staff %}
+            <li>
+                <a href="{% url 'admin:password_change' %}">{% trans 'Change password' %}</a>
+            </li>
+            <li>
+                <a href="{% url 'admin:logout' %}">{% trans 'Log out' %}</a>
+            </li>
+        {% endif %}
+    </ul>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>Список учебных групп</h1>
+{% if is_instructor %}
+{% endif %}
+<ul class="list-group">
+    {% for group in groups %}
+        <li class="list-group-item">
+            <a href="{% url 'learnsys:group_detail' group.id %}">{{ group.name }}</a>
+        </li>
+    {% empty %}
+        <li class="list-group-item">Нет доступных групп.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}Удалить участника из группы{% endblock %}
+
+{% block content %}
+<h2>Удалить участника из группы</h2>
+
+<p>Вы уверены, что хотите удалить участника {{ object.user.get_full_name }} из группы "{{ group.name }}"?</p>
+
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Удалить</button>
+    <a href="{% url 'learnsys:group_detail' group.id %}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}

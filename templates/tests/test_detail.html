@@ -1,0 +1,73 @@
+<!-- templates/tests/test_detail.html -->
+
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}{{ test.title }}{% endblock %}
+
+{% block content %}
+<h2>Тест: {{ test.title }}</h2>
+
+<!-- Section for instructors only -->
+{% if is_instructor %}
+    <div class="mb-3">
+        <a href="{% url 'learnsys:manage_test_retakes' test_id=test.id %}" class="btn btn-info">Управление повторными прохождениями теста</a>
+        <a href="{% url 'learnsys:testitem_add' test_id=test.id %}" class="btn btn-success">Добавить вопрос</a>
+        <a href="{% url 'learnsys:test_update' pk=test.id %}" class="btn btn-warning">Редактировать тест</a>
+        <a href="{% url 'learnsys:test_delete' pk=test.id %}" class="btn btn-danger">Удалить тест</a>
+    </div>
+
+    <!-- Display all questions and options for the instructor with editing capabilities -->
+    <ul class="list-group">
+        {% for item in test_items %}
+            <li class="list-group-item">
+                <strong>Вопрос {{ forloop.counter }}:</strong> {{ item.content }}
+
+                {% if item.question_type|is_choice_type %}
+                    <ul class="mt-2">
+                        {% for option in item.options.all %}
+                            <li>
+                                {{ option.content }}
+                                {% if option.is_correct %}
+                                    <span class="badge badge-success">Правильный ответ</span>
+                                {% endif %}
+                                <a href="{% url 'learnsys:testitemoption_edit' pk=option.id %}" class="btn btn-sm btn-primary ml-2">Редактировать</a>
+                                <a href="{% url 'learnsys:testitemoption_delete' pk=option.id %}" class="btn btn-sm btn-danger ml-2">Удалить</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                <!-- Controls for editing questions -->
+                <div class="mt-2">
+                    <a href="{% url 'learnsys:testitem_edit' pk=item.id %}" class="btn btn-sm btn-primary">Редактировать</a>
+                    <a href="{% url 'learnsys:testitem_delete' pk=item.id %}" class="btn btn-sm btn-danger">Удалить</a>
+                    {% if item.question_type != 'text' %}
+                        <a href="{% url 'learnsys:testitemoption_add' item_id=item.id %}" class="btn btn-sm btn-secondary">Добавить вариант ответа</a>
+                    {% endif %}
+                </div>
+            </li>
+        {% empty %}
+            <li class="list-group-item">Вопросы отсутствуют.</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<!-- Section for students only -->
+{% if not is_instructor %}
+    <!-- Form for students to take the test -->
+    {% if can_take_test %}
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn btn-primary mt-3">Завершить тест</button>
+        </form>
+    {% elif test_result %}
+        <div class="alert alert-info mt-3">
+            <p>Вы уже прошли этот тест.</p>
+            <p>Ваш результат: {{ test_result.score }}/{{ test_result.total_questions }}</p>
+        </div>
+    {% endif %}
+{% endif %}
+
+{% endblock %}

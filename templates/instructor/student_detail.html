@@ -1,0 +1,53 @@
+<!-- templates/instructor/student_detail.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}{{ student.get_full_name }} - Статистика{% endblock %}
+
+{% block content %}
+<h2>Студент: {{ student.get_full_name }}</h2>
+<p><strong>Email:</strong> {{ student.email }}</p>
+<p><strong>Номер группы:</strong> {{ group_number }}</p>
+<p><strong>Дата рождения:</strong> {{ date_of_birth|date:"d.m.Y" }}</p>
+<p><strong>Предпочтение учебных материалов:</strong> {{ material_preference }}</p>
+
+{% if course_stats_list %}
+    {% for course_stat in course_stats_list %}
+        <h3>Статистика по курсу "{{ course_stat.course.name }}"</h3>
+        <p><strong>Прогресс:</strong> {{ course_stat.progress_percentage }}%</p>
+        <p><strong>Пройдено тестов:</strong> {{ course_stat.completed_tests }} из {{ course_stat.total_tests }}</p>
+
+        <h4>Результаты тестов</h4>
+        {% if course_stat.test_results_list %}
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Тест</th>
+                        <th>Результат</th>
+                        <th>Дата прохождения</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in course_stat.test_results_list %}
+                        <tr>
+                            <td>{{ item.test.name }}</td>
+                            {% if item.test_result %}
+                                <td>{{ item.test_result.score }} / {{ item.test_result.total_questions }}</td>
+                                <td>{{ item.test_result.timestamp|date:"d.m.Y H:i" }}</td>
+                            {% else %}
+                                <td>Не пройден</td>
+                                <td>-</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Нет данных о результатах тестов.</p>
+        {% endif %}
+    {% endfor %}
+{% else %}
+    <p>Студент не записан на ваши курсы.</p>
+{% endif %}
+
+{% endblock %}

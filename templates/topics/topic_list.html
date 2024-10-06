@@ -1,0 +1,31 @@
+<!-- templates/topics/topic_list.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Темы курса "{{ course.name }}"{% endblock %}
+
+{% block content %}
+<h2>Темы курса "{{ course.name }}"</h2>
+
+<ul class="list-group">
+    {% for topic in topics %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <a href="{% url 'learnsys:topic_detail' pk=topic.id %}">{{ topic.name }}</a>
+            {% if is_instructor %}
+                <div>
+                    <a href="{% url 'learnsys:topic_edit' pk=topic.id %}" class="btn btn-sm btn-primary">Редактировать</a>
+                    <a href="{% url 'learnsys:topic_delete' pk=topic.id %}" class="btn btn-sm btn-danger">Удалить</a>
+                </div>
+            {% endif %}
+        </li>
+    {% empty %}
+        <li class="list-group-item">Тем не найдено.</li>
+    {% endfor %}
+</ul>
+
+{% if is_instructor %}
+    <a href="{% url 'learnsys:topic_create' course_id=course.id %}" class="btn btn-success mt-3">Добавить тему</a>
+{% endif %}
+
+<a href="{% url 'learnsys:course_detail' pk=course.id %}" class="btn btn-secondary mt-3">Назад к курсу</a>
+{% endblock %}

@@ -1,0 +1,54 @@
+<!-- profile/profile_update.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Редактировать профиль{% endblock %}
+
+{% block content %}
+<h2>Редактировать профиль</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="form-row">
+        <div class="form-group col-md-6">
+            <label for="{{ form.surname.id_for_label }}">{{ form.surname.label }}{% if form.surname.field.required %} *{% endif %}</label>
+            {{ form.surname }}
+            {{ form.surname.errors }}
+        </div>
+        <div class="form-group col-md-6">
+            <label for="{{ form.given_name.id_for_label }}">{{ form.given_name.label }}{% if form.given_name.field.required %} *{% endif %}</label>
+            {{ form.given_name }}
+            {{ form.given_name.errors }}
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="{{ form.patronymic.id_for_label }}">{{ form.patronymic.label }}</label>
+        {{ form.patronymic }}
+        {{ form.patronymic.errors }}
+    </div>
+    <div class="form-row">
+        <div class="form-group col-md-6">
+            <label for="{{ form.group_number.id_for_label }}">{{ form.group_number.label }}</label>
+            {{ form.group_number }}
+            {{ form.group_number.errors }}
+        </div>
+        <div class="form-group col-md-6">
+            <label for="{{ form.date_of_birth.id_for_label }}">{{ form.date_of_birth.label }}</label>
+            {{ form.date_of_birth }}
+            {{ form.date_of_birth.errors }}
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="{{ form.email.id_for_label }}">{{ form.email.label }}{% if form.email.field.required %} *{% endif %}</label>
+        {{ form.email }}
+        {{ form.email.errors }}
+    </div>
+    <div class="form-group">
+        <label for="{{ form.username.id_for_label }}">{{ form.username.label }}{% if form.username.field.required %} *{% endif %}</label>
+        {{ form.username }}
+        {{ form.username.errors }}
+    </div>
+    <button type="submit" class="btn btn-primary">Сохранить</button>
+    <a href="{% url 'learnsys:profile' %}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}

@@ -1,0 +1,31 @@
+<!-- templates/topics/topic_form.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}{% if object %}Редактировать тему{% else %}Создать тему{% endif %}{% endblock %}
+
+{% block content %}
+<h2>{% if object %}Редактировать тему{% else %}Создать тему{% endif %}</h2>
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="form-group">
+        <label for="{{ form.name.id_for_label }}">{{ form.name.label }}{% if form.name.field.required %} *{% endif %}</label>
+        {{ form.name }}
+        {{ form.name.errors }}
+    </div>
+    <div class="form-group">
+        <label for="{{ form.description.id_for_label }}">{{ form.description.label }}{% if form.description.field.required %} *{% endif %}</label>
+        {{ form.description }}
+        {{ form.description.errors }}
+    </div>
+    <div class="form-group">
+        <label for="{{ form.parent_topic.id_for_label }}">{{ form.parent_topic.label }}</label>
+        {{ form.parent_topic }}
+        {{ form.parent_topic.errors }}
+    </div>
+    <button type="submit" class="btn btn-primary">{% if object %}Сохранить{% else %}Создать{% endif %}</button>
+    <!-- Исправленная кнопка Отмены -->
+    <a href="{% url 'learnsys:topic_list' course_id=course.id %}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}

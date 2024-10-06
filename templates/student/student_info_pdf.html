@@ -1,0 +1,75 @@
+<!-- templates/instructor/student_info_pdf.html -->
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Информация о студенте</title>
+    <style>
+        body {
+            font-family: DejaVu Sans, sans-serif;
+        }
+        h1 {
+            text-align: center;
+        }
+        .info {
+            margin: 20px;
+        }
+        .info p {
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <h1>Информация о студенте</h1>
+    <div class="info">
+        <p><strong>ФИО:</strong> {{ student.get_full_name }}</p>
+        <p><strong>Email:</strong> {{ student.email }}</p>
+        <p><strong>Номер группы:</strong> {{ student.group_number }}</p>
+        <p><strong>Дата рождения:</strong> {{ student.date_of_birth|date:"d.m.Y" }}</p>
+    </div>
+
+    {% for course_stat in course_stats_list %}
+        <h2>Статистика по курсу "{{ course_stat.course.name }}"</h2>
+        <p><strong>Прогресс:</strong> {{ course_stat.progress_percentage }}%</p>
+        <p><strong>Пройдено тестов:</strong> {{ course_stat.completed_tests }} из {{ course_stat.total_tests }}</p>
+
+        <h3>Результаты тестов</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Тест</th>
+                    <th>Результат</th>
+                    <th>Дата прохождения</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in course_stat.test_results_list %}
+                    <tr>
+                        <td>{{ item.test.name }}</td>
+                        {% if item.test_result %}
+                            <td>{{ item.test_result.score }} / {{ item.test_result.total_questions }}</td>
+                            <td>{{ item.test_result.timestamp|date:"d.m.Y H:i" }}</td>
+                        {% else %}
+                            <td>Не пройден</td>
+                            <td>-</td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
+</body>
+</html>

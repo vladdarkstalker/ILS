@@ -1,0 +1,17 @@
+<!-- templates/tests/manage_test_retakes.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Управление повторными прохождениями теста{% endblock %}
+
+{% block content %}
+<h2>Управление повторными прохождениями теста</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-warning">Разрешить повторное прохождение</button>
+</form>
+
+<a href="{% url 'learnsys:test_detail' pk=view.kwargs.test_id %}" class="btn btn-secondary mt-3">Назад к тесту</a>
+{% endblock %}

@@ -1,0 +1,16 @@
+<!-- templates/tests/testitemoption_confirm_delete.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Удалить вариант ответа{% endblock %}
+
+{% block content %}
+<h2>Подтвердите удаление варианта ответа</h2>
+<p>Вы уверены, что хотите удалить этот вариант ответа "{{ object.content }}"?</p>
+
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Удалить</button>
+    <a href="{% url 'learnsys:test_detail' pk=test_item.test.id %}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}

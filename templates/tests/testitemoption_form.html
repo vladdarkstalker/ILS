@@ -1,0 +1,27 @@
+<!-- templates/tests/testitemoption_form.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Добавить вариант ответа{% endblock %}
+
+{% block content %}
+<h2>Добавить вариант ответа для вопроса "{{ test_item.content }}"</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="form-group">
+        {{ form.content.label_tag }}
+        {{ form.content }}
+        {{ form.content.errors }}
+    </div>
+    <div class="form-group form-check">
+        {{ form.is_correct }}
+        {{ form.is_correct.label_tag }}
+    </div>
+    <button type="submit" class="btn btn-primary">Добавить вариант ответа</button>
+</form>
+
+<hr>
+
+<a href="{% url 'learnsys:test_detail' pk=test_item.test.id %}" class="btn btn-secondary">Перейти к тесту</a>
+{% endblock %}

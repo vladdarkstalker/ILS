@@ -1,0 +1,21 @@
+<!-- profile/profile.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Профиль{% endblock %}
+
+{% block content %}
+<h2>Профиль пользователя</h2>
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">{{ user.get_full_name }}</h5>
+        <p class="card-text"><strong>Фамилия:</strong> {{ user.surname }}</p>
+        <p class="card-text"><strong>Имя:</strong> {{ user.given_name }}</p>
+        <p class="card-text"><strong>Отчество:</strong> {{ user.patronymic }}</p>
+        <p class="card-text"><strong>Дата рождения:</strong> {{ user.date_of_birth|date:"d.m.Y" }}</p>
+        <p class="card-text"><strong>Email:</strong> {{ user.email }}</p>
+        <p class="card-text"><strong>Username:</strong> {{ user.username }}</p>
+        <a href="{% url 'learnsys:profile_edit' %}" class="btn btn-primary">Редактировать профиль</a>
+    </div>
+</div>
+{% endblock %}

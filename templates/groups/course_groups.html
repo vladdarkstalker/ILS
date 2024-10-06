@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block title %}Группы курса "{{ course.name }}"{% endblock %}
+
+{% block content %}
+<h2>Группы курса "{{ course.name }}"</h2>
+
+{% if groups %}
+    <ul class="list-group mb-4">
+        {% for group in groups %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <a href="{% url 'learnsys:group_members' course.id group.id %}">{{ group.name }}</a>
+                <a href="{% url 'learnsys:group_edit' group.id %}" class="btn btn-sm btn-warning">Редактировать</a>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>Группы не найдены.</p>
+{% endif %}
+
+<a href="{% url 'learnsys:course_group_add' course.id %}" class="btn btn-primary">Добавить группу</a>
+<a href="{% url 'learnsys:instructor_dashboard' %}" class="btn btn-secondary">Назад к дашборду</a>
+{% endblock %}

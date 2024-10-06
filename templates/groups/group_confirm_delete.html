@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block title %}Удалить группу{% endblock %}
+
+{% block content %}
+<h2>Удалить группу "{{ group.name }}"?</h2>
+<p>Вы уверены, что хотите удалить эту группу? Это действие нельзя отменить.</p>
+
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Удалить</button>
+    <a href="{% url 'learnsys:group_members' course.id group.id %}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}

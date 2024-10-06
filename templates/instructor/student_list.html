@@ -1,0 +1,36 @@
+<!-- templates/instructor/student_list.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Студенты курса {{ course.name }}{% endblock %}
+
+{% block content %}
+<h2>Студенты курса "{{ course.name }}"</h2>
+
+{% if students %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Имя</th>
+                <th>Email</th>
+                <th>Прогресс</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+                <tr>
+                    <td>{{ student.get_full_name }}</td>
+                    <td>{{ student.email }}</td>
+                    <td>{{ student_progress|get_item:student.id|default:"-" }}%</td>
+                    <td>
+                        <a href="{% url 'learnsys:student_detail' course.id student.id %}" class="btn btn-sm btn-primary">Подробнее</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>Студенты не найдены.</p>
+{% endif %}
+{% endblock %}

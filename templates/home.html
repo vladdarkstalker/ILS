@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block title %}Главная страница{% endblock %}
+
+{% block content %}
+<div class="jumbotron">
+    <h1 class="display-4">Добро пожаловать в систему обучения!</h1>
+    <p class="lead">Это платформа для управления курсами, группами и тестами.</p>
+    {% if not user.is_authenticated %}
+        <hr class="my-4">
+        <p>Пожалуйста, войдите в систему или зарегистрируйтесь, чтобы начать.</p>
+        <a class="btn btn-primary btn-lg" href="{% url 'learnsys:login' %}" role="button">Войти</a>
+        <a class="btn btn-success btn-lg" href="{% url 'learnsys:register' %}" role="button">Регистрация</a>
+    {% endif %}
+</div>
+{% endblock %}

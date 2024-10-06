@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% load custom_filters %}
+
+{% block title %}Дашборд студента{% endblock %}
+
+{% block content %}
+<h2>Добро пожаловать, {{ user.get_full_name }}!</h2>
+
+<h3>Ваши курсы</h3>
+{% if courses %}
+    <div class="row">
+        {% for course in courses %}
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ course.name }}</h5>
+                        <p class="card-text">{{ course.description|truncatewords:20 }}</p>
+                        <p class="card-text">
+                            Прогресс: {{ course_stats|get_item:course.id|get_item:'progress_percentage'|default:0 }}%
+                        </p>
+                        <p class="card-text">
+                            Пройдено тестов: {{ course_stats|get_item:course.id|get_item:'completed_tests' }}/{{ course_stats|get_item:course.id|get_item:'total_tests' }}
+                        </p>
+                        <p class="card-text">
+                            Правильных ответов: {{ course_stats|get_item:course.id|get_item:'correct_answers' }} / {{ course_stats|get_item:course.id|get_item:'total_questions' }}
+                        </p>
+                        <a href="{% url 'learnsys:course_detail' course.id %}" class="btn btn-primary">Перейти к курсу</a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>Вы еще не записаны ни на один курс.</p>
+{% endif %}
+{% endblock %}

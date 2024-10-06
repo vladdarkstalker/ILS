@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if form.instance.pk %}Редактировать курс{% else %}Создать курс{% endif %}{% endblock %}
+
+{% block content %}
+<h2>{% if form.instance.pk %}Редактировать курс{% else %}Создать курс{% endif %}</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+            {{ field }}
+            {{ field.errors }}
+        </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-success">{% if form.instance.pk %}Сохранить{% else %}Создать{% endif %}</button>
+    <a href="{% url 'learnsys:instructor_dashboard' %}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}
