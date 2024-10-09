@@ -5,11 +5,16 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group as AuthGroup
 from django.utils.text import Truncator
 from .models import (
-    User, Course, Topic, StudyGroup, GroupMember,
-    CourseMaterialPreference, TopicContent, Test, TestItem, TestItemOption,
-    PsychologicalTestResult, TestResult, UserTestAnswer
+    User, Course, Topic, StudyGroup, GroupMember, TopicContent, Test, TestItem, TestItemOption, TestResult, UserTestAnswer
 )
+from .models import TestRetakePermission
 
+@admin.register(TestRetakePermission)
+class TestRetakePermissionAdmin(admin.ModelAdmin):
+    list_display = ('user', 'test', 'can_retake')
+    list_filter = ('can_retake', 'test')
+    search_fields = ('user__username', 'test__title')
+    
 # Отменяем регистрацию встроенной модели Group (группы прав)
 admin.site.unregister(AuthGroup)
 
@@ -68,12 +73,6 @@ class GroupMemberAdmin(admin.ModelAdmin):
         return obj.user.get_full_name()
     user_full_name.short_description = 'Участник'
 
-# Регистрация модели предпочтений учебных материалов
-@admin.register(CourseMaterialPreference)
-class CourseMaterialPreferenceAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
-
 # Регистрация модели содержания темы
 @admin.register(TopicContent)
 class TopicContentAdmin(admin.ModelAdmin):
@@ -125,17 +124,6 @@ class TestItemOptionAdmin(admin.ModelAdmin):
     def formatted_option(self, obj):
         return Truncator(obj.content).chars(50)
     formatted_option.short_description = 'Вариант ответа'
-
-# Регистрация модели результатов психологического теста
-@admin.register(PsychologicalTestResult)
-class PsychologicalTestResultAdmin(admin.ModelAdmin):
-    list_display = ('user_full_name', 'preference')
-    list_filter = ('preference',)
-    search_fields = ('user__username', 'user__given_name', 'user__surname', 'preference__name')
-
-    def user_full_name(self, obj):
-        return obj.user.get_full_name()
-    user_full_name.short_description = 'Пользователь'
 
 # Регистрация модели результатов теста
 @admin.register(TestResult)

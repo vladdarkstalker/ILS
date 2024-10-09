@@ -32,11 +32,14 @@
         {% endif %}
 
         {% if is_instructor %}
-            <!-- Кнопка удаления контента -->
-            <form method="post" action="{% url 'learnsys:topiccontent_delete' content.id %}" class="mt-2" onsubmit="return confirm('Вы уверены, что хотите удалить этот материал?');">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger btn-sm">Удалить материал</button>
-            </form>
+            <!-- Кнопки редактирования и удаления контента -->
+            <div class="mt-2">
+                <a href="{% url 'learnsys:topiccontent_edit' pk=content.id %}" class="btn btn-warning btn-sm">Редактировать материал</a>
+                <form method="post" action="{% url 'learnsys:topiccontent_delete' content.id %}" style="display:inline;" onsubmit="return confirm('Вы уверены, что хотите удалить этот материал?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">Удалить материал</button>
+                </form>
+            </div>
         {% endif %}
     </div>
 {% empty %}
@@ -58,3 +61,4 @@
 
 <a href="{% url 'learnsys:course_detail' topic.course.id %}" class="btn btn-secondary">Назад к курсу</a>
 {% endblock %}
+

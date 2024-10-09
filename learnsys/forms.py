@@ -242,28 +242,6 @@ class TopicContentForm(forms.ModelForm):
             'order_index': 'Порядок отображения',
         }
 
-class CourseMaterialPreferenceForm(forms.ModelForm):
-    class Meta:
-        model = CourseMaterialPreference
-        fields = ['name']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-        }
-        labels = {
-            'name': 'Название предпочтения',
-        }
-
-class PsychologicalTestResultForm(forms.ModelForm):
-    class Meta:
-        model = PsychologicalTestResult
-        fields = ['preference']
-        widgets = {
-            'preference': forms.Select(attrs={'class': 'form-control'}),
-        }
-        labels = {
-            'preference': 'Предпочтение',
-        }
-
 class GroupForm(forms.ModelForm):
     class Meta:
         model = StudyGroup

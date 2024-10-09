@@ -211,12 +211,24 @@ class TestDetailView(LoginRequiredMixin, DetailView):
         test_items = self.object.items.all().prefetch_related('options')
         context['test_items'] = test_items
 
-        # Проверяем, проходил ли студент уже этот тест
-        test_result = TestResult.objects.filter(user=self.request.user, test=self.object).first()
-        context['test_result'] = test_result
+        # Получаем все результаты теста для студента
+        test_results = TestResult.objects.filter(user=self.request.user, test=self.object).order_by('-date_taken')
+        context['test_results'] = test_results
 
-        # Если test_result существует, студент не может повторно пройти тест
-        context['can_take_test'] = is_student(self.request.user) and not test_result
+        # Проверяем, может ли студент пройти тест
+        if is_student(self.request.user):
+            can_retake_permission = TestRetakePermission.objects.filter(
+                user=self.request.user,
+                test=self.object,
+                can_retake=True
+            ).exists()
+            if not test_results.exists() or can_retake_permission:
+                context['can_take_test'] = True
+            else:
+                context['can_take_test'] = False
+        else:
+            context['can_take_test'] = False
+
         context['is_instructor'] = is_instructor(self.request.user) and self.object.topic.course.instructor == self.request.user
         context['form'] = TestAnswerForm(test_items=test_items) if context['can_take_test'] else None
         return context
@@ -227,10 +239,6 @@ class TestDetailView(LoginRequiredMixin, DetailView):
         form = TestAnswerForm(request.POST, test_items=test_items)
 
         if form.is_valid():
-            # Удаляем существующие результаты и ответы студента для этого теста
-            TestResult.objects.filter(user=request.user, test=self.object).delete()
-            UserTestAnswer.objects.filter(user=request.user, item__test=self.object).delete()
-
             score = 0
             total_questions = test_items.count()
 
@@ -290,6 +298,9 @@ class TestDetailView(LoginRequiredMixin, DetailView):
                 total_questions=total_questions
             )
 
+            # Отзыв разрешения на повторное прохождение теста после прохождения
+            TestRetakePermission.objects.filter(user=request.user, test=self.object).update(can_retake=False)
+            
             messages.success(request, f"Ваши ответы были сохранены. Ваш результат: {score}/{total_questions}.")
             return redirect('learnsys:course_detail', pk=self.object.topic.course.id)
         else:
@@ -304,13 +315,16 @@ class ResetTestPermissionView(LoginRequiredMixin, UserPassesTestMixin, View):
         test = get_object_or_404(Test, id=self.kwargs['test_id'])
         student = get_object_or_404(User, id=self.kwargs['student_id'])
 
-        # Удаляем существующие результаты и ответы студента
-        TestResult.objects.filter(user=student, test=test).delete()
-        UserTestAnswer.objects.filter(user=student, item__test=test).delete()
+        # Предоставляем разрешение на повторное прохождение теста без удаления предыдущих результатов
+        TestRetakePermission.objects.update_or_create(
+            user=student,
+            test=test,
+            defaults={'can_retake': True}
+        )
 
         messages.success(request, f"Студенту {student.get_full_name()} разрешено повторно пройти тест.")
         return redirect('learnsys:test_detail', pk=test.id)
-
+        
 class ManageTestRetakesView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     template_name = 'tests/manage_test_retakes.html'
     form_class = TestRetakePermissionForm
@@ -336,9 +350,12 @@ class ManageTestRetakesView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         student = form.cleaned_data['student']
         test = get_object_or_404(Test, id=self.kwargs['test_id'])
 
-        # Reset test permission by deleting TestResult and UserTestAnswer
-        TestResult.objects.filter(user=student, test=test).delete()
-        UserTestAnswer.objects.filter(user=student, item__test=test).delete()
+        # Предоставляем разрешение на повторное прохождение теста без удаления предыдущих результатов
+        TestRetakePermission.objects.update_or_create(
+            user=student,
+            test=test,
+            defaults={'can_retake': True}
+        )
 
         messages.success(self.request, f"Студенту {student.get_full_name()} разрешено повторно пройти тест.")
         return redirect('learnsys:test_detail', pk=test.id)
@@ -430,17 +447,18 @@ class StudentDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             test_results_list = []
 
             for test in tests:
-                test_result = TestResult.objects.filter(user=student, test=test).order_by('-id').first()
-                if test_result:
+                test_results = TestResult.objects.filter(user=student, test=test).order_by('-date_taken')
+                if test_results.exists():
                     completed_tests += 1
-                    total_score += test_result.score
-                    total_questions += test_result.total_questions
+                    latest_result = test_results.first()
+                    total_score += latest_result.score
+                    total_questions += latest_result.total_questions
                 else:
                     total_questions += test.items.count()
 
                 test_results_list.append({
                     'test': test,
-                    'test_result': test_result,
+                    'test_results': test_results,
                 })
 
             if total_questions > 0:
@@ -457,11 +475,17 @@ class StudentDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             })
 
         context['course_stats_list'] = course_stats_list
+        
+                # Получаем группу студента
+        group_membership = GroupMember.objects.filter(user=student).select_related('study_group').first()
+        if group_membership:
+            context['student_group'] = group_membership.study_group
+        else:
+            context['student_group'] = None
 
         # Добавляем дополнительные данные о студенте
         context['group_number'] = student.group_number
         context['date_of_birth'] = student.date_of_birth
-        context['material_preference'] = "Видео и интерактивные материалы"
 
         return context
 
@@ -552,11 +576,11 @@ class CourseUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return is_instructor(self.request.user) and self.get_object().instructor == self.request.user
 
     def form_valid(self, form):
-        messages.success(self.request, "Курс успешно обновлён.")
+        messages.success(self.request, "Course updated successfully.")
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse('learnsys:instructor_dashboard')
+        return reverse_lazy('learnsys:instructor_dashboard')
 
 class CourseCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = Course
@@ -852,7 +876,6 @@ class CourseListView(LoginRequiredMixin, ListView):
             context['role'] = 'student'
         return context
 
-
 class GroupCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = StudyGroup
     form_class = GroupForm
@@ -1132,7 +1155,7 @@ class TopicDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['contents'] = self.object.contents.all()
+        context['contents'] = self.object.contents.order_by('order_index')
         user = self.request.user
         context['is_instructor'] = is_instructor(user) and self.object.course.instructor == user
         context['is_student'] = is_student(user) and not context['is_instructor']

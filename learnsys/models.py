@@ -18,7 +18,20 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.get_full_name()
+        
+class TestRetakePermission(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Пользователь")
+    test = models.ForeignKey('Test', on_delete=models.CASCADE, verbose_name="Тест")  # Используем строковое представление
+    can_retake = models.BooleanField("Может повторно пройти тест", default=False)
 
+    class Meta:
+        unique_together = ('user', 'test')
+        verbose_name = "Разрешение на повторное прохождение теста"
+        verbose_name_plural = "Разрешения на повторное прохождение тестов"
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.test.title} - {'Разрешено' if self.can_retake else 'Запрещено'}"
+        
 class Course(models.Model):
     name = models.CharField("Название курса", max_length=255, unique=True)
     description = models.TextField("Описание")
@@ -116,7 +129,7 @@ class TopicContent(models.Model):
     class Meta:
         verbose_name = "Материал темы"
         verbose_name_plural = "Материалы тем"
-
+        
 class Test(models.Model):
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='tests', verbose_name="Тема")
     title = models.CharField("Название теста", max_length=255)
@@ -148,7 +161,7 @@ class TestItem(models.Model):
         verbose_name = "Вопрос теста"
         verbose_name_plural = "Вопросы тестов"
         ordering = ['order_index']
-
+        
 class TestItemOption(models.Model):
     item = models.ForeignKey(TestItem, on_delete=models.CASCADE, related_name='options', verbose_name="Вопрос")
     content = models.CharField("Вариант ответа", max_length=255)
@@ -175,28 +188,6 @@ class UserTestAnswer(models.Model):
         verbose_name = "Ответ пользователя"
         verbose_name_plural = "Ответы пользователей"
 
-class CourseMaterialPreference(models.Model):
-    name = models.CharField("Название предпочтения", max_length=255, unique=True)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name = "Предпочтение учебного материала"
-        verbose_name_plural = "Предпочтения учебных материалов"
-
-class PsychologicalTestResult(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Пользователь")
-    preference = models.ForeignKey(CourseMaterialPreference, on_delete=models.CASCADE, verbose_name="Предпочтение")
-
-    def __str__(self):
-        return f"{self.user.get_full_name()} - {self.preference.name}"
-
-    class Meta:
-        verbose_name = "Результат психологического теста"
-        verbose_name_plural = "Результаты психологических тестов"
-        unique_together = ('user', 'preference')
-
 class TestResult(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Пользователь")
     test = models.ForeignKey(Test, on_delete=models.CASCADE, verbose_name="Тест", related_name='test_results')
@@ -210,4 +201,3 @@ class TestResult(models.Model):
     class Meta:
         verbose_name = "Результат теста"
         verbose_name_plural = "Результаты тестов"
-        unique_together = ('user', 'test')
