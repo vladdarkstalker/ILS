@@ -27,8 +27,17 @@
     <p>Тестов по данной теме пока нет.</p>
 {% endif %}
 
-<!-- Conditional button label based on view context -->
 {% if is_instructor %}
+    <div class="mb-3">
+        {% if not topic.tests.exists %}
+            <form method="post" action="{% url 'learnsys:generate_questions' topic.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">Сгенерировать Тест по Теме</button>
+            </form>
+        {% else %}
+            <p>Автоматический Тест уже создан для этой темы.</p>
+        {% endif %}
+    </div>
     <a href="{% url 'learnsys:test_create' topic_id=topic.id %}" class="btn btn-success mt-3">
         Создать новый тест
     </a>

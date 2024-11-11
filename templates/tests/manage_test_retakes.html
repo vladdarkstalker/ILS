@@ -1,17 +1,19 @@
 <!-- templates/tests/manage_test_retakes.html -->
 
 {% extends 'base.html' %}
-
 {% block title %}Управление повторными прохождениями теста{% endblock %}
 
 {% block content %}
 <h2>Управление повторными прохождениями теста</h2>
+<p>Тест: {{ test.title }}</p>
 
 <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit" class="btn btn-warning">Разрешить повторное прохождение</button>
+    {% if form.fields.students.queryset.exists %}
+        <button type="submit" class="btn btn-primary">Разрешить повторное прохождение</button>
+    {% else %}
+        <p>Все студенты, которые уже прошли тест, имеют разрешение на повторное прохождение или не нуждаются в нем.</p>
+    {% endif %}
 </form>
-
-<a href="{% url 'learnsys:test_detail' pk=view.kwargs.test_id %}" class="btn btn-secondary mt-3">Назад к тесту</a>
 {% endblock %}

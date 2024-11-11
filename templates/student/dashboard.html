@@ -1,31 +1,39 @@
 {% extends 'base.html' %}
 
-{% load custom_filters %}
-
 {% block title %}Дашборд студента{% endblock %}
 
 {% block content %}
 <h2>Добро пожаловать, {{ user.get_full_name }}!</h2>
 
 <h3>Ваши курсы</h3>
-{% if courses %}
+{% if course_stats %}
     <div class="row">
-        {% for course in courses %}
+        {% for stat in course_stats %}
             <div class="col-md-4">
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h5 class="card-title">{{ course.name }}</h5>
-                        <p class="card-text">{{ course.description|truncatewords:20 }}</p>
+                        <h5 class="card-title">{{ stat.course.name }}</h5>
+                        <p class="card-text">{{ stat.course.description|truncatewords:20 }}</p>
+                        
+                        <!-- Отображение прогресса курса -->
+    <div>
+        <h3>{{ topic.name }}</h3>
+        <p>Описание: {{ topic.description }}</p>
+        <p>Прогресс: 
+            {% if topic.progress %}
+                {% if topic.progress.started_reading %}Чтение начато{% endif %}
+                {% if topic.progress.test_completed %}Тест пройден с результатом {{ topic.progress.test_score_percentage }}%{% endif %}
+            {% else %}
+                Нет прогресса
+            {% endif %}
+        </p>
+    </div>
                         <p class="card-text">
-                            Прогресс: {{ course_stats|get_item:course.id|get_item:'progress_percentage'|default:0 }}%
+                            Завершено тем: {{ stat.completed_topics }} из {{ stat.total_topics }}
                         </p>
-                        <p class="card-text">
-                            Пройдено тестов: {{ course_stats|get_item:course.id|get_item:'completed_tests' }}/{{ course_stats|get_item:course.id|get_item:'total_tests' }}
-                        </p>
-                        <p class="card-text">
-                            Правильных ответов: {{ course_stats|get_item:course.id|get_item:'correct_answers' }} / {{ course_stats|get_item:course.id|get_item:'total_questions' }}
-                        </p>
-                        <a href="{% url 'learnsys:course_detail' course.id %}" class="btn btn-primary">Перейти к курсу</a>
+                        
+                        <!-- Кнопка перехода к деталям курса -->
+                        <a href="{% url 'learnsys:course_detail' stat.course.id %}" class="btn btn-primary">Перейти к курсу</a>
                     </div>
                 </div>
             </div>

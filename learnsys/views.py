@@ -9,6 +9,8 @@ from django.views.generic import (
     ListView, CreateView, UpdateView, DeleteView, DetailView, View, TemplateView, FormView
 )
 from .forms import *
+import difflib
+from django.db.models import Sum
 from .models import *
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -25,6 +27,189 @@ from django.contrib import messages
 from django.db.models import Subquery, OuterRef, Max
 from django.template.loader import render_to_string
 import csv
+from django.shortcuts import redirect
+from django.contrib import messages
+from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from .models import Topic, Test, TestItem
+from .utils.question_generation import generate_questions_from_text
+# from .utils.question_generation import generate_questions_from_texts
+import logging
+import traceback
+from django.utils import timezone
+from .utils.content_processing import transcribe_audio, translate_ru_to_en, process_content
+from .utils.translate_text import translate_ru_to_en
+from .utils.content_processing import process_content
+from .utils.question_answer_generation import generate_questions_and_answers
+import logging
+import traceback
+from django.utils.text import Truncator
+import logging
+from langdetect import detect
+
+logger = logging.getLogger('learnsys')
+
+class TestResultDetailView(LoginRequiredMixin, DetailView):
+    model = TestResult
+    template_name = 'tests/test_result_detail.html'
+    context_object_name = 'test_result'
+    pk_url_kwarg = 'test_result_id'  # Specify the URL parameter for pk
+
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        if obj.user != self.request.user:
+            raise PermissionDenied("У вас нет доступа к этому результату теста.")
+        return obj
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        test_result = self.object
+        test = test_result.test
+
+        # Get user answers
+        user_answers = UserTestAnswer.objects.filter(
+            user=self.request.user,
+            item__test=test
+        ).select_related('item')
+
+        # Create a dictionary for quick access to user answers
+        user_answers_dict = {answer.item.id: answer for answer in user_answers}
+
+        # Get all test items
+        test_items = test.items.prefetch_related('options')
+
+        # Prepare data for display
+        results = []
+        for item in test_items:
+            user_answer = user_answers_dict.get(item.id)
+            correct_options = list(item.options.filter(is_correct=True))
+            selected_options = user_answer.option.all() if user_answer else []
+            correct = False
+
+            if item.question_type in ['single_choice', 'multiple_choice']:
+                correct = set(selected_options) == set(correct_options)
+            elif item.question_type == 'text':
+                correct = self.check_text_answer(
+                    user_answer.text_answer,
+                    item.correct_text_answer
+                ) if user_answer else False
+
+            results.append({
+                'item': item,
+                'user_answer': user_answer,
+                'correct': correct,
+                'correct_options': correct_options,  # Add correct options here
+            })
+
+        context['results'] = results
+        return context
+
+    def check_text_answer(self, user_answer, correct_answer):
+        # Normalize and compare text answers
+        normalized_user = ' '.join(user_answer.lower().split())
+        normalized_correct = ' '.join(correct_answer.lower().split())
+
+        if normalized_user == normalized_correct:
+            return True
+
+        from difflib import SequenceMatcher
+        similarity = SequenceMatcher(None, normalized_user, normalized_correct).ratio()
+        return similarity > 0.8  # Adjust similarity threshold if needed
+
+logger = logging.getLogger(__name__)
+
+class GenerateQuestionsView(LoginRequiredMixin, UserPassesTestMixin, View):
+    def post(self, request, *args, **kwargs):
+        topic_id = kwargs.get('pk')
+        topic = get_object_or_404(Topic, pk=topic_id)
+
+        # Проверяем права доступа
+        if not (request.user == topic.course.instructor):
+            messages.error(request, "У вас нет прав для выполнения этого действия.")
+            logger.warning(f"Пользователь {request.user} попытался сгенерировать тест для темы {topic.id}, но не имеет прав.")
+            return redirect('learnsys:topic_detail', pk=topic.id)
+
+        # Собираем все материалы с обработанным текстом
+        contents_with_generated_text = topic.contents.filter(generated_text__isnull=False)
+
+        if not contents_with_generated_text.exists():
+            messages.error(request, "Нет обработанных материалов для генерации вопросов.")
+            logger.info(f"Для темы {topic.id} нет обработанных материалов.")
+            return redirect('learnsys:topic_detail', pk=topic.id)
+
+        all_questions_and_answers = []
+
+        # Логируем список контента для отладки
+        content_ids = contents_with_generated_text.values_list('id', 'content_type')
+        logger.debug(f"Содержимое для генерации вопросов: {list(content_ids)}")
+
+        # Генерируем вопросы и ответы из каждого материала
+        for content in contents_with_generated_text:
+            text = content.generated_text
+            try:
+                # Генерируем вопросы и ответы
+                questions_and_answers = generate_questions_and_answers(text)
+                if not questions_and_answers:
+                    logger.info(f"Генерация вопросов для контента {content.id} не дала результатов.")
+                    continue
+
+                # Добавляем информацию о контенте к каждому вопросу и ответу
+                for qa in questions_and_answers:
+                    qa['content_id'] = content.id
+                    qa['content_name'] = content.get_content_type_display()
+
+                all_questions_and_answers.extend(questions_and_answers)
+            except Exception as e:
+                error_message = traceback.format_exc()
+                logger.error(f"Ошибка при генерации вопросов для контента ID {content.id}: {error_message}")
+                messages.error(request, f"Ошибка при генерации вопросов: {str(e)}")
+                return redirect('learnsys:topic_detail', pk=topic.id)
+
+        if not all_questions_and_answers:
+            messages.error(request, f"Не удалось сгенерировать вопросы для темы '{topic.name}'.")
+            logger.info(f"Генерация вопросов для темы {topic.id} не дала результатов.")
+            return redirect('learnsys:topic_detail', pk=topic.id)
+
+        # Создаём новый тест
+        test_title = f"Тест по теме '{topic.name}' #{Test.objects.filter(topic=topic).count() + 1}"
+        test = Test.objects.create(
+            topic=topic,
+            title=test_title,
+            description='Автоматически сгенерированный тест'
+        )
+        logger.info(f"Создан новый тест '{test_title}' для темы {topic.id}.")
+
+        # Создаём вопросы и ответы с информацией о контенте
+        for idx, qa in enumerate(all_questions_and_answers, start=1):
+            question_text = qa.get('question')
+            correct_answer = qa.get('answer')
+            content_id = qa.get('content_id')
+            content_name = qa.get('content_name')
+
+            if question_text and correct_answer:
+                test_item = TestItem.objects.create(
+                    test=test,
+                    content=question_text,
+                    question_type='text',
+                    correct_text_answer=correct_answer,
+                    source_content_id=content_id  # Убедитесь, что это поле существует и является ForeignKey
+                )
+                logger.debug(f"Создан вопрос {idx} из контента {content_id} ('{content_name}'): '{question_text}' с ответом: '{correct_answer}'.")
+            else:
+                logger.warning(f"Неполный QA-параметр: {qa}")
+
+        messages.success(request, f"Вопросы и ответы для темы '{topic.name}' успешно сгенерированы и добавлены в тест '{test.title}'.")
+        logger.info(f"Генерация вопросов для темы {topic.id} завершена успешно.")
+        return redirect('learnsys:test_detail', pk=test.id)
+
+    def test_func(self):
+        topic = get_object_or_404(Topic, pk=self.kwargs.get('pk'))
+        return self.request.user == topic.course.instructor
+
+    def handle_no_permission(self):
+        messages.error(self.request, "У вас нет прав для выполнения этого действия.")
+        logger.warning(f"Пользователь {self.request.user} не имеет прав для генерации вопросов для темы {self.kwargs.get('pk')}.")
+        return redirect('learnsys:topic_detail', pk=self.kwargs.get('pk'))
 
 # Представления для тестов
 # Удаление теста
@@ -197,54 +382,62 @@ class TestDetailView(LoginRequiredMixin, DetailView):
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
         user = self.request.user
-        course = obj.topic.course
-
-        if is_instructor(user) and course.instructor == user:
-            return obj
-        elif is_student(user) and course.study_groups.filter(group_members__user=user).exists():
-            return obj
-        else:
-            raise PermissionDenied("У вас нет доступа к этому тесту.")
+        if not user.is_staff:
+            # Создаем или получаем прогресс по теме
+            topic_progress, created = TopicProgress.objects.get_or_create(user=user, topic=obj.topic)  # Передаем obj.topic, чтобы передать объект Topic
+            topic_progress.mark_reading_started()
+        return obj
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        test_items = self.object.items.all().prefetch_related('options')
-        context['test_items'] = test_items
+        user = self.request.user
+        test = self.get_object()
+        
+        # Получаем все вопросы теста
+        context['test_items'] = test.items.all()
 
-        # Получаем все результаты теста для студента
-        test_results = TestResult.objects.filter(user=self.request.user, test=self.object).order_by('-date_taken')
-        context['test_results'] = test_results
+        # Проверка, является ли пользователь инструктором
+        context['is_instructor'] = is_instructor(user) and test.topic.course.instructor == user
 
-        # Проверяем, может ли студент пройти тест
-        if is_student(self.request.user):
-            can_retake_permission = TestRetakePermission.objects.filter(
-                user=self.request.user,
-                test=self.object,
-                can_retake=True
-            ).exists()
-            if not test_results.exists() or can_retake_permission:
-                context['can_take_test'] = True
-            else:
-                context['can_take_test'] = False
-        else:
-            context['can_take_test'] = False
-
-        context['is_instructor'] = is_instructor(self.request.user) and self.object.topic.course.instructor == self.request.user
-        context['form'] = TestAnswerForm(test_items=test_items) if context['can_take_test'] else None
+        # Проверка, прошел ли студент тест и имеет ли разрешение на ретейк
+        has_taken_test = TestResult.objects.filter(user=user, test=test).exists()
+        retake_permission = TestRetakePermission.objects.filter(user=user, test=test, allowed=True).exists()
+        
+        # Логика отображения формы для студента
+        context['can_take_test'] = not has_taken_test or retake_permission
+        if context['can_take_test']:
+            context['form'] = TestAnswerForm(test_items=context['test_items'])
+        
+        # Последний результат теста для отображения
+        context['test_result'] = TestResult.objects.filter(user=user, test=test).order_by('-date_taken').first()
+        
         return context
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-        test_items = self.object.items.all()
+        user = request.user
+        test = self.object
+
+        # Проверка возможности прохождения теста студентом
+        has_taken_test = TestResult.objects.filter(user=user, test=test).exists()
+        retake_permission = TestRetakePermission.objects.filter(user=user, test=test, allowed=True).exists()
+
+        if has_taken_test and not retake_permission:
+            messages.error(request, "Вы уже прошли этот тест. Повторное прохождение возможно только с разрешения инструктора.")
+            return redirect('learnsys:test_detail', pk=test.id)
+
+        # Получаем вопросы теста и данные формы
+        test_items = test.items.all()
         form = TestAnswerForm(request.POST, test_items=test_items)
 
         if form.is_valid():
             score = 0
             total_questions = test_items.count()
 
+            # Сохраняем ответы и вычисляем баллы
             for item in test_items:
                 field_name = f"item_{item.id}"
-                user_answer = form.cleaned_data[field_name]
+                user_answer = form.cleaned_data.get(field_name)
 
                 if item.question_type == 'single_choice':
                     selected_options = [user_answer]
@@ -254,11 +447,10 @@ class TestDetailView(LoginRequiredMixin, DetailView):
                     if selected_options_ids == correct_options_ids:
                         score += 1
 
-                    # Сохраняем ответы пользователя
                     for option_id in selected_options:
                         option = item.options.get(id=option_id)
                         UserTestAnswer.objects.create(
-                            user=request.user,
+                            user=user,
                             item=item,
                             option=option
                         )
@@ -267,44 +459,85 @@ class TestDetailView(LoginRequiredMixin, DetailView):
                     selected_options = user_answer
                     correct_options_ids = set(item.options.filter(is_correct=True).values_list('id', flat=True))
                     selected_options_ids = set(int(option_id) for option_id in selected_options)
-    
+
                     if selected_options_ids == correct_options_ids:
                         score += 1
 
-                    # Сохраняем ответы пользователя
                     for option_id in selected_options:
                         option = item.options.get(id=option_id)
                         UserTestAnswer.objects.create(
-                            user=request.user,
+                            user=user,
                             item=item,
                             option=option
                         )
 
                 elif item.question_type == 'text':
                     UserTestAnswer.objects.create(
-                        user=request.user,
+                        user=user,
                         item=item,
                         text_answer=user_answer
                     )
-                    # Проверка правильности текстового ответа
-                    if user_answer.strip().lower() == item.correct_text_answer.strip().lower():
+                    if self.check_text_answer(user_answer, item.correct_text_answer):
                         score += 1
 
-            # Сохраняем результат теста
-            TestResult.objects.create(
-                user=request.user,
-                test=self.object,
+            # Сохранение результата теста
+            test_result = TestResult.objects.create(
+                user=user,
+                test=test,
                 score=score,
-                total_questions=total_questions
+                total_questions=total_questions,
+                date_taken=timezone.now()
             )
 
-            # Отзыв разрешения на повторное прохождение теста после прохождения
-            TestRetakePermission.objects.filter(user=request.user, test=self.object).update(can_retake=False)
-            
+            # Обновляем прогресс по теме
+            topic_progress, created = TopicProgress.objects.get_or_create(user=user, topic=test.topic)
+            topic_progress.mark_test_completed(score, total_questions)
+
+            # Удаляем разрешение на повторное прохождение
+            TestRetakePermission.objects.filter(user=user, test=test).delete()
+
             messages.success(request, f"Ваши ответы были сохранены. Ваш результат: {score}/{total_questions}.")
-            return redirect('learnsys:course_detail', pk=self.object.topic.course.id)
-        else:
-            return self.render_to_response(self.get_context_data(form=form))
+
+            # Перенаправляем на страницу результатов теста
+            return redirect('learnsys:test_result_detail', test_result_id=test_result.id)
+
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def check_text_answer(self, user_answer, correct_answer):
+        """
+        Проверка текстовых ответов с учетом регистра и пробелов.
+        """
+        normalized_user = ' '.join(user_answer.lower().split())
+        normalized_correct = ' '.join(correct_answer.lower().split())
+
+        if normalized_user == normalized_correct:
+            return True
+
+        from difflib import SequenceMatcher
+        similarity = SequenceMatcher(None, normalized_user, normalized_correct).ratio()
+        return similarity > 0.8  # Порог схожести можно настроить
+
+class TakeTestAgainView(LoginRequiredMixin, UserPassesTestMixin, View):
+    def test_func(self):
+        test = get_object_or_404(Test, id=self.kwargs['test_id'])
+        user = self.request.user
+        course = test.topic.course
+        return is_student(user) and course.study_groups.filter(group_members__user=user).exists()
+
+    def post(self, request, *args, **kwargs):
+        test = get_object_or_404(Test, id=self.kwargs['test_id'])
+        user = request.user
+
+        # Проверяем, разрешено ли повторное прохождение
+        if not test.allow_retakes:
+            messages.error(request, "Повторное прохождение этого теста запрещено.")
+            return redirect('learnsys:test_detail', pk=test.id)
+
+        # Проверяем, есть ли уже результаты теста
+        # (зависит от логики, можно разрешить всегда проходить или ограничить количество попыток)
+        # В данном случае разрешаем всегда
+
+        return redirect('learnsys:test_detail', pk=test.id)
 
 class ResetTestPermissionView(LoginRequiredMixin, UserPassesTestMixin, View):
     def test_func(self):
@@ -315,49 +548,40 @@ class ResetTestPermissionView(LoginRequiredMixin, UserPassesTestMixin, View):
         test = get_object_or_404(Test, id=self.kwargs['test_id'])
         student = get_object_or_404(User, id=self.kwargs['student_id'])
 
-        # Предоставляем разрешение на повторное прохождение теста без удаления предыдущих результатов
-        TestRetakePermission.objects.update_or_create(
-            user=student,
-            test=test,
-            defaults={'can_retake': True}
-        )
+        # Вместо удаления результатов, разрешаем повторное прохождение
+        test.allow_retakes = True
+        test.save()
 
         messages.success(request, f"Студенту {student.get_full_name()} разрешено повторно пройти тест.")
         return redirect('learnsys:test_detail', pk=test.id)
-        
+
 class ManageTestRetakesView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     template_name = 'tests/manage_test_retakes.html'
-    form_class = TestRetakePermissionForm
-    
+    form_class = ManageTestRetakesForm
+
     def test_func(self):
         test = get_object_or_404(Test, id=self.kwargs['test_id'])
         return is_instructor(self.request.user) and test.topic.course.instructor == self.request.user
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        test_id = self.kwargs['test_id']
-        test = get_object_or_404(Test, id=test_id)
-
-        # Get students who have completed the test
-        completed_students = User.objects.filter(
-            testresult__test=test
-        ).distinct()
-
-        kwargs['students'] = completed_students
+        test = get_object_or_404(Test, id=self.kwargs['test_id'])
+        kwargs['test'] = test
         return kwargs
 
     def form_valid(self, form):
-        student = form.cleaned_data['student']
         test = get_object_or_404(Test, id=self.kwargs['test_id'])
+        students = form.cleaned_data['students']
 
-        # Предоставляем разрешение на повторное прохождение теста без удаления предыдущих результатов
-        TestRetakePermission.objects.update_or_create(
-            user=student,
-            test=test,
-            defaults={'can_retake': True}
-        )
+        # Создаем разрешения для выбранных студентов
+        for student in students:
+            TestRetakePermission.objects.update_or_create(
+                user=student,
+                test=test,
+                defaults={'allowed': True}
+            )
 
-        messages.success(self.request, f"Студенту {student.get_full_name()} разрешено повторно пройти тест.")
+        messages.success(self.request, "Разрешение на повторное прохождение выдано выбранным студентам.")
         return redirect('learnsys:test_detail', pk=test.id)
 
 class TestCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
@@ -447,18 +671,17 @@ class StudentDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             test_results_list = []
 
             for test in tests:
-                test_results = TestResult.objects.filter(user=student, test=test).order_by('-date_taken')
-                if test_results.exists():
+                test_result = TestResult.objects.filter(user=student, test=test).order_by('-id').first()
+                if test_result:
                     completed_tests += 1
-                    latest_result = test_results.first()
-                    total_score += latest_result.score
-                    total_questions += latest_result.total_questions
+                    total_score += test_result.score
+                    total_questions += test_result.total_questions
                 else:
                     total_questions += test.items.count()
 
                 test_results_list.append({
                     'test': test,
-                    'test_results': test_results,
+                    'test_result': test_result,
                 })
 
             if total_questions > 0:
@@ -475,17 +698,11 @@ class StudentDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             })
 
         context['course_stats_list'] = course_stats_list
-        
-                # Получаем группу студента
-        group_membership = GroupMember.objects.filter(user=student).select_related('study_group').first()
-        if group_membership:
-            context['student_group'] = group_membership.study_group
-        else:
-            context['student_group'] = None
 
         # Добавляем дополнительные данные о студенте
         context['group_number'] = student.group_number
         context['date_of_birth'] = student.date_of_birth
+        context['material_preference'] = "Видео и интерактивные материалы"
 
         return context
 
@@ -576,11 +793,11 @@ class CourseUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return is_instructor(self.request.user) and self.get_object().instructor == self.request.user
 
     def form_valid(self, form):
-        messages.success(self.request, "Course updated successfully.")
+        messages.success(self.request, "Курс успешно обновлён.")
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse_lazy('learnsys:instructor_dashboard')
+        return reverse('learnsys:instructor_dashboard')
 
 class CourseCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = Course
@@ -627,38 +844,24 @@ class StudentDashboardView(LoginRequiredMixin, TemplateView):
         context['courses'] = courses
 
         # Собираем статистику для каждого курса
-        course_stats = {}
+        course_stats = []
         for course in courses:
-            # Получаем все тесты курса
-            tests = Test.objects.filter(topic__course=course)  # Исправлено: topic__course вместо topic__courses
+            topics = course.topics.all()
+            total_topics = topics.count()
+            completed_topics = topics.filter(progresses__user=user, progresses__status='completed').distinct().count()
 
-            total_tests = tests.count()
-            total_score = 0
-            total_questions = 0
-            completed_tests = 0
+            # Прогресс курса в процентах
+            if total_topics > 0:
+                progress_percentage = round((completed_topics / total_topics) * 100, 2)
+            else:
+                progress_percentage = 0
 
-            for test in tests:
-                # Получаем последний результат теста для студента
-                test_result = TestResult.objects.filter(
-                    test=test,
-                    user=user
-                ).order_by('-id').first()
-
-                if test_result:
-                    completed_tests += 1
-                    total_score += test_result.score
-                    total_questions += test_result.total_questions
-
-            # Вычисляем прогресс
-            progress_percentage = (total_score / total_questions * 100) if total_questions > 0 else 0
-
-            course_stats[course.id] = {
-                'progress_percentage': round(progress_percentage, 2),
-                'completed_tests': completed_tests,
-                'total_tests': total_tests,
-                'correct_answers': total_score,
-                'total_questions': total_questions,
-            }
+            course_stats.append({
+                'course': course,
+                'progress_percentage': progress_percentage,
+                'completed_topics': completed_topics,
+                'total_topics': total_topics,
+            })
 
         context['course_stats'] = course_stats
         return context
@@ -713,8 +916,22 @@ class TopicContentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView
         return is_instructor(self.request.user) and topic_content.topic.course.instructor == self.request.user
 
     def form_valid(self, form):
-        messages.success(self.request, "Материал успешно обновлен.")
-        return super().form_valid(form)
+        response = super().form_valid(form)
+
+        # После сохранения контента выполняем обработку
+        try:
+            success, message = process_content(form.instance)
+            if success:
+                messages.success(self.request, message)
+                logger.info(f"Контент ID {form.instance.id} успешно обработан.")
+            else:
+                messages.error(self.request, message)
+                logger.error(f"Ошибка при обработке контента ID {form.instance.id}: {message}")
+        except Exception as e:
+            messages.error(self.request, f"Неизвестная ошибка при обработке контента: {e}")
+            logger.error(f"Неизвестная ошибка при обработке контента ID {form.instance.id}: {e}", exc_info=True)
+
+        return response
 
     def get_success_url(self):
         return reverse('learnsys:topic_detail', kwargs={'pk': self.object.topic.id})
@@ -731,20 +948,28 @@ class TopicContentCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView
 
     def test_func(self):
         topic = get_object_or_404(Topic, id=self.kwargs.get('topic_id'))
-        return is_instructor(self.request.user) and topic.course.instructor == self.request.user
+        return self.request.user == topic.course.instructor
 
     def form_valid(self, form):
         topic = get_object_or_404(Topic, id=self.kwargs.get('topic_id'))
         form.instance.topic = topic
 
-        # Если выбран тип контента "Текст", очищаем поле content
-        if form.cleaned_data['content_type'] == 'text':
-            form.instance.content = None
-        else:
-            form.instance.text_content = None
+        response = super().form_valid(form)
 
-        messages.success(self.request, "Материал успешно добавлен.")
-        return super().form_valid(form)
+        # После сохранения контента выполняем обработку
+        try:
+            success, message = process_content(form.instance)
+            if success:
+                messages.success(self.request, message)
+                logger.info(f"Контент ID {form.instance.id} успешно обработан.")
+            else:
+                messages.error(self.request, message)
+                logger.error(f"Ошибка при обработке контента ID {form.instance.id}: {message}")
+        except Exception as e:
+            messages.error(self.request, f"Неизвестная ошибка при обработке контента: {e}")
+            logger.error(f"Неизвестная ошибка при обработке контента ID {form.instance.id}: {e}", exc_info=True)
+
+        return response
 
     def get_success_url(self):
         return reverse('learnsys:topic_detail', kwargs={'pk': self.object.topic.id})
@@ -876,6 +1101,7 @@ class CourseListView(LoginRequiredMixin, ListView):
             context['role'] = 'student'
         return context
 
+
 class GroupCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = StudyGroup
     form_class = GroupForm
@@ -972,13 +1198,11 @@ class GroupListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         user = self.request.user
         if is_instructor(user):
-            # Преподаватели могут видеть только группы своих курсов
+            # Преподаватель видит группы, связанные с его курсами
             return StudyGroup.objects.filter(courses__instructor=user).distinct()
         elif is_student(user):
-            # Студенты могут видеть группы, в которых они состоят
             return StudyGroup.objects.filter(group_members__user=user).distinct()
         elif user.is_superuser:
-            # Администраторы могут видеть все группы
             return StudyGroup.objects.all()
         else:
             return StudyGroup.objects.none()
@@ -999,10 +1223,9 @@ class GroupDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         if user.is_superuser:
             return True
         elif is_instructor(user):
-            # Преподаватель видит группу, если он является инструктором хотя бы одного из связанных курсов
+            # Проверяем, связан ли преподаватель с курсами этой группы
             return group.courses.filter(instructor=user).exists()
         elif is_student(user):
-            # Студент может видеть группу, если он состоит в ней
             return group.group_members.filter(user=user).exists()
         else:
             return False
@@ -1011,9 +1234,15 @@ class GroupDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         context = super().get_context_data(**kwargs)
         group = self.object
         user = self.request.user
-        context['members'] = group.group_members.select_related('user')
         context['is_instructor'] = is_instructor(user)
-        context['courses'] = group.courses.all()
+        if context['is_instructor']:
+            # Отображаем все курсы группы, связанных с преподавателем
+            context['courses'] = group.courses.filter(instructor=user)
+            # Отображаем всех членов группы без дополнительной фильтрации
+            context['members'] = group.group_members.select_related('user')
+        else:
+            context['courses'] = group.courses.all()
+            context['members'] = group.group_members.select_related('user')
         return context
 
 class DownloadStudentInfoView(LoginRequiredMixin, UserPassesTestMixin, View):
@@ -1038,7 +1267,7 @@ class DownloadStudentInfoView(LoginRequiredMixin, UserPassesTestMixin, View):
         student_id = self.kwargs.get('pk')
         student = get_object_or_404(User, id=student_id)
 
-        # Собираем информацию о студенте (можно добавить информацию по курсам, если необходимо)
+        # Создаём CSV-файл
         response = HttpResponse(
             content_type='text/csv',
             headers={'Content-Disposition': f'attachment; filename="student_{student.id}_info.csv"'},
@@ -1051,21 +1280,20 @@ class DownloadStudentInfoView(LoginRequiredMixin, UserPassesTestMixin, View):
         writer.writerow(['Номер группы', student.group_number])
 
         # Проверка на наличие даты рождения
-        if student.date_of_birth:
-            formatted_dob = student.date_of_birth.strftime('%d.%m.%Y')
-        else:
-            formatted_dob = 'Не указано'
+        formatted_dob = student.date_of_birth.strftime('%d.%m.%Y') if student.date_of_birth else 'Не указано'
         writer.writerow(['Дата рождения', formatted_dob])
 
-        # Пример дополнительных полей с проверкой на None
         # Отчество
-        if student.patronymic:
-            patronymic = student.patronymic
-        else:
-            patronymic = 'Не указано'
+        patronymic = student.patronymic if student.patronymic else 'Не указано'
         writer.writerow(['Отчество', patronymic])
 
-        # Дополнительные поля можно добавить аналогичным образом
+        # Добавляем статистику по тестам
+        test_results = TestResult.objects.filter(user=student).select_related('test')
+        writer.writerow([])  # Пустая строка для разделения
+        writer.writerow(['Тест', 'Баллы', 'Всего вопросов', 'Дата прохождения'])
+
+        for result in test_results:
+            writer.writerow([result.test.title, result.score, result.total_questions, result.date_taken.strftime('%d.%m.%Y %H:%M')])
 
         return response
 
@@ -1144,21 +1372,36 @@ class TopicDetailView(LoginRequiredMixin, DetailView):
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
         user = self.request.user
-        course = obj.course
+        if not user.is_staff:
+            # Создаем или получаем прогресс по теме
+            topic_progress, created = TopicProgress.objects.get_or_create(user=user, topic=obj)
+            topic_progress.mark_reading_started()
+        return obj
 
-        if is_instructor(user) and course.instructor == user:
-            return obj
-        elif is_student(user) and course.study_groups.filter(group_members__user=user).exists():
-            return obj
-        else:
-            raise PermissionDenied("У вас нет доступа к этой теме.")
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        user = self.request.user
+        if not user.is_staff:
+            # Создаем или получаем прогресс по теме
+            topic_progress, created = TopicProgress.objects.get_or_create(user=user, topic=obj)
+            topic_progress.mark_reading_started()
+        return obj
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['contents'] = self.object.contents.order_by('order_index')
+        context['contents'] = self.object.contents.all()
         user = self.request.user
         context['is_instructor'] = is_instructor(user) and self.object.course.instructor == user
         context['is_student'] = is_student(user) and not context['is_instructor']
+        
+        # Отслеживание начала изучения темы
+        if is_student(user):
+            progress, created = TopicProgress.objects.get_or_create(user=user, topic=self.object)
+            if created or progress.status == 'not_started':
+                progress.status = 'in_progress'
+                progress.started_at = timezone.now()
+                progress.save()
+
         return context
 
 class TopicCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):

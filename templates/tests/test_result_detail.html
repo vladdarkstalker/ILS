@@ -1,0 +1,62 @@
+<!-- templates/tests/test_result_detail.html -->
+
+{% extends 'base.html' %}
+{% block title %}Результаты теста: {{ test_result.test.title }}{% endblock %}
+
+{% block content %}
+<h2>Результаты теста: {{ test_result.test.title }}</h2>
+<p>Ваш результат: {{ test_result.score }} из {{ test_result.total_questions }}</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Вопрос</th>
+            <th>Ваш ответ</th>
+            <th>Правильный ответ</th>
+            <th>Статус</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for result in results %}
+            <tr>
+                <td>{{ result.item.content }}</td>
+                <td>
+                    {% if result.item.question_type == 'single_choice' or result.item.question_type == 'multiple_choice' %}
+                        {% if result.user_answer %}
+                            {% for option in result.user_answer.option.all %}
+                                {{ option.content }}{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            Нет ответа
+                        {% endif %}
+                    {% elif result.item.question_type == 'text' %}
+                        {% if result.user_answer %}
+                            {{ result.user_answer.text_answer }}
+                        {% else %}
+                            Нет ответа
+                        {% endif %}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if result.item.question_type == 'single_choice' or result.item.question_type == 'multiple_choice' %}
+                        {% for option in result.correct_options %}
+                            {{ option.content }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    {% elif result.item.question_type == 'text' %}
+                        {{ result.item.correct_text_answer }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if result.correct %}
+                        <span class="badge bg-success">Верно</span>
+                    {% else %}
+                        <span class="badge bg-danger">Неверно</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<a href="{% url 'learnsys:course_detail' pk=test_result.test.topic.course.id %}" class="btn btn-primary">Вернуться к курсу</a>
+{% endblock %}

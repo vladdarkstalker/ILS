@@ -144,4 +144,36 @@ LOGOUT_REDIRECT_URL = 'learnsys:home'
 #LOGOUT_REDIRECT_URL = '/login/'
 AUTH_USER_MODEL = 'learnsys.User'
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,  # Не отключать существующие логгеры
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',  # Используем подробный формат
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',  # Логировать INFO и выше
+            'propagate': True,
+        },
+        'learnsys': {  # Замените 'learnsys' на имя вашего приложения, если оно отличается
+            'handlers': ['console'],
+            'level': 'DEBUG',  # Логировать DEBUG и выше для вашего приложения
+            'propagate': False,
+        },
+    },
+}
 

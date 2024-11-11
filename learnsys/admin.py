@@ -5,18 +5,27 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group as AuthGroup
 from django.utils.text import Truncator
 from .models import (
-    User, Course, Topic, StudyGroup, GroupMember, TopicContent, Test, TestItem, TestItemOption, TestResult, UserTestAnswer
+    User, Course, Topic, StudyGroup, GroupMember,
+    CourseMaterialPreference, TopicContent, Test, TestItem, TestItemOption,
+    PsychologicalTestResult, TestResult, UserTestAnswer, TopicProgress, TestRetakePermission
 )
-from .models import TestRetakePermission
+
+# Отменяем регистрацию встроенной модели Group (группы прав)
+admin.site.unregister(AuthGroup)
 
 @admin.register(TestRetakePermission)
 class TestRetakePermissionAdmin(admin.ModelAdmin):
-    list_display = ('user', 'test', 'can_retake')
-    list_filter = ('can_retake', 'test')
-    search_fields = ('user__username', 'test__title')
-    
-# Отменяем регистрацию встроенной модели Group (группы прав)
-admin.site.unregister(AuthGroup)
+    list_display = ('user_full_name', 'test_title', 'allowed', 'granted_at')
+    list_filter = ('allowed', 'test__topic__course')
+    search_fields = ('user__username', 'user__given_name', 'user__surname', 'test__title')
+
+    def user_full_name(self, obj):
+        return obj.user.get_full_name()
+    user_full_name.short_description = 'Пользователь'
+
+    def test_title(self, obj):
+        return obj.test.title
+    test_title.short_description = 'Тест'
 
 # Регистрация модели пользователя с настройкой отображения
 @admin.register(User)
@@ -40,6 +49,16 @@ class UserAdmin(BaseUserAdmin):
     def get_full_name(self, obj):
         return obj.get_full_name()
     get_full_name.short_description = 'Полное имя'
+
+@admin.register(TopicProgress)
+class TopicProgressAdmin(admin.ModelAdmin):
+    list_display = ('user_full_name', 'topic', 'status', 'started_at', 'completed_at', 'correct_answers', 'total_tests')
+    list_filter = ('status', 'topic__course')
+    search_fields = ('user__username', 'user__given_name', 'user__surname', 'topic__name', 'topic__course__name')
+
+    def user_full_name(self, obj):
+        return obj.user.get_full_name()
+    user_full_name.short_description = 'Пользователь'
 
 # Регистрация модели учебной группы
 @admin.register(StudyGroup)
@@ -72,6 +91,12 @@ class GroupMemberAdmin(admin.ModelAdmin):
     def user_full_name(self, obj):
         return obj.user.get_full_name()
     user_full_name.short_description = 'Участник'
+
+# Регистрация модели предпочтений учебных материалов
+@admin.register(CourseMaterialPreference)
+class CourseMaterialPreferenceAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
 
 # Регистрация модели содержания темы
 @admin.register(TopicContent)
@@ -125,6 +150,17 @@ class TestItemOptionAdmin(admin.ModelAdmin):
         return Truncator(obj.content).chars(50)
     formatted_option.short_description = 'Вариант ответа'
 
+# Регистрация модели результатов психологического теста
+@admin.register(PsychologicalTestResult)
+class PsychologicalTestResultAdmin(admin.ModelAdmin):
+    list_display = ('user_full_name', 'preference')
+    list_filter = ('preference',)
+    search_fields = ('user__username', 'user__given_name', 'user__surname', 'preference__name')
+
+    def user_full_name(self, obj):
+        return obj.user.get_full_name()
+    user_full_name.short_description = 'Пользователь'
+
 # Регистрация модели результатов теста
 @admin.register(TestResult)
 class TestResultAdmin(admin.ModelAdmin):
@@ -139,7 +175,7 @@ class TestResultAdmin(admin.ModelAdmin):
 # Регистрация модели ответов пользователя на вопросы теста
 @admin.register(UserTestAnswer)
 class UserTestAnswerAdmin(admin.ModelAdmin):
-    list_display = ('user_full_name', 'item', 'option', 'text_answer', 'date_answered')
+    list_display = ('user_full_name', 'item', 'text_answer', 'date_answered')
     list_filter = ('item__test', 'user')
     search_fields = ('user__username', 'user__given_name', 'user__surname', 'item__content')
 

@@ -56,8 +56,8 @@ urlpatterns = [
 
     # Управление контентом темы
     path('topics/<int:topic_id>/contents/add/', views.TopicContentCreateView.as_view(), name='topiccontent_add'),
-    path('topiccontents/<int:pk>/edit/', views.TopicContentUpdateView.as_view(), name='topiccontent_edit'),
-    path('topiccontents/<int:pk>/delete/', views.TopicContentDeleteView.as_view(), name='topiccontent_delete'),
+    path('topiccontents/<int:pk>/edit/', views.TopicContentUpdateView.as_view(), name='topic_content_edit'),
+    path('topiccontents/<int:pk>/delete/', views.TopicContentDeleteView.as_view(), name='topic_content_delete'),
 
     # Тесты
     path('topics/<int:topic_id>/tests/', views.TestListView.as_view(), name='test_list'),
@@ -66,6 +66,8 @@ urlpatterns = [
     path('tests/<int:pk>/edit/', views.TestUpdateView.as_view(), name='test_update'),
     path('tests/<int:pk>/delete/', views.TestDeleteView.as_view(), name='test_delete'),
     path('tests/<int:test_id>/manage_retakes/', views.ManageTestRetakesView.as_view(), name='manage_test_retakes'),
+    path('tests/<int:test_id>/take_again/', views.TakeTestAgainView.as_view(), name='take_test_again'),
+    path('test_results/<int:test_result_id>/', views.TestResultDetailView.as_view(), name='test_result_detail'),
 
     # Управление вопросами теста
     path('tests/<int:test_id>/items/add/', views.TestItemCreateView.as_view(), name='testitem_add'),
@@ -79,5 +81,7 @@ urlpatterns = [
 
     # Дополнительные пути для загрузки информации о студенте
     path('instructor/students/<int:pk>/download/', views.DownloadStudentInfoView.as_view(), name='download_student_info'),
+
+    path('topics/<int:pk>/generate_questions/', views.GenerateQuestionsView.as_view(), name='generate_questions'),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

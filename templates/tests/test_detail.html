@@ -7,22 +7,25 @@
 
 {% block content %}
 <h2>Тест: {{ test.title }}</h2>
+<p>{{ test.description }}</p>
 
-<!-- Section for instructors only -->
+<!-- Раздел для инструкторов -->
 {% if is_instructor %}
     <div class="mb-3">
         <a href="{% url 'learnsys:manage_test_retakes' test_id=test.id %}" class="btn btn-info">Управление повторными прохождениями теста</a>
-        <a href="{% url 'learnsys:testitem_add' test_id=test.id %}" class="btn btn-success">Добавить вопрос</a>
+        <a href="{% url 'learnsys:testitem_add' test.id %}" class="btn btn-success">Добавить вопрос</a>
         <a href="{% url 'learnsys:test_update' pk=test.id %}" class="btn btn-warning">Редактировать тест</a>
         <a href="{% url 'learnsys:test_delete' pk=test.id %}" class="btn btn-danger">Удалить тест</a>
     </div>
 
-    <!-- Display all questions and options for the instructor with editing capabilities -->
+    <!-- Отображение всех вопросов для инструктора -->
     <ul class="list-group">
         {% for item in test_items %}
             <li class="list-group-item">
                 <strong>Вопрос {{ forloop.counter }}:</strong> {{ item.content }}
-
+        {% if item.source_content %}
+            <p><strong>Источник контента:</strong> {{ item.source_content.get_content_type_display }} (ID: {{ item.source_content.id }})</p>
+        {% endif %}
                 {% if item.question_type|is_choice_type %}
                     <ul class="mt-2">
                         {% for option in item.options.all %}
@@ -38,7 +41,7 @@
                     </ul>
                 {% endif %}
 
-                <!-- Controls for editing questions -->
+                <!-- Контролы для редактирования вопросов -->
                 <div class="mt-2">
                     <a href="{% url 'learnsys:testitem_edit' pk=item.id %}" class="btn btn-sm btn-primary">Редактировать</a>
                     <a href="{% url 'learnsys:testitem_delete' pk=item.id %}" class="btn btn-sm btn-danger">Удалить</a>
@@ -53,21 +56,27 @@
     </ul>
 {% endif %}
 
-<!-- Section for students only -->
+<!-- Раздел для студентов -->
 {% if not is_instructor %}
-    <!-- Form for students to take the test -->
     {% if can_take_test %}
         <form method="post">
             {% csrf_token %}
             {{ form.as_p }}
-            <button type="submit" class="btn btn-primary mt-3">Завершить тест</button>
+            <button type="submit" class="btn btn-success">Завершить тест</button>
         </form>
     {% elif test_result %}
         <div class="alert alert-info mt-3">
             <p>Вы уже прошли этот тест.</p>
             <p>Ваш результат: {{ test_result.score }}/{{ test_result.total_questions }}</p>
+            {% if test.allow_retakes %}
+                <form method="post" action="{% url 'learnsys:take_test_again' test.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary">Пройти тест снова</button>
+                </form>
+            {% endif %}
         </div>
+    {% else %}
+        <p>Вы уже прошли этот тест. Повторное прохождение запрещено.</p>
     {% endif %}
 {% endif %}
-
 {% endblock %}
