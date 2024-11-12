@@ -46,20 +46,51 @@ class TestAnswerForm(forms.Form):
             elif item.question_type == 'text':
                 self.fields[field_name] = forms.CharField(
                     label=item.content,
-                    widget=forms.Textarea(attrs={'rows': 2}),
+                    widget=forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
                     required=True,
                 )
 
-class TestRetakePermissionForm(forms.Form):
-    student = forms.ModelChoiceField(
+class TestRetakePermissionForm(forms.ModelForm):
+    class Meta:
+        model = TestRetakePermission
+        fields = ['user', 'allowed']
+        widgets = {
+            'user': forms.Select(attrs={'class': 'form-control'}),
+            'allowed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'user': 'Студент',
+            'allowed': 'Разрешить повторное прохождение',
+        }
+
+    def __init__(self, *args, **kwargs):
+        test = kwargs.pop('test', None)
+        super().__init__(*args, **kwargs)
+        if test:
+            self.fields['user'].queryset = User.objects.filter(
+                testresult__test=test
+            ).distinct()
+        else:
+            self.fields['user'].queryset = User.objects.none()
+
+class ManageTestRetakesForm(forms.Form):
+    students = forms.ModelMultipleChoiceField(
         queryset=User.objects.none(),
-        label="Выберите студента для разрешения повторного прохождения"
+        widget=forms.CheckboxSelectMultiple,
+        label="Выберите студентов для разрешения повторного прохождения"
     )
 
     def __init__(self, *args, **kwargs):
-        students = kwargs.pop('students', User.objects.none())
+        test = kwargs.pop('test', None)
         super().__init__(*args, **kwargs)
-        self.fields['student'].queryset = students
+
+        # Фильтрация студентов: только те, кто уже проходил тест, но не имеет активного разрешения на повторное прохождение
+        if test:
+            self.fields['students'].queryset = User.objects.filter(
+                testresult__test=test
+            ).exclude(
+                testretakepermission__test=test, testretakepermission__allowed=True
+            ).distinct()
 
 class UserRegisterForm(UserCreationForm):
     email = forms.EmailField(
@@ -228,18 +259,41 @@ class TestItemOptionForm(forms.ModelForm):
 class TopicContentForm(forms.ModelForm):
     class Meta:
         model = TopicContent
-        fields = ['content_type', 'text_content', 'content', 'order_index']
+        fields = ['content_type', 'content', 'text_content', 'order_index']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        content_type = cleaned_data.get('content_type')
+        content = cleaned_data.get('content')
+        text_content = cleaned_data.get('text_content')
+
+        if content_type == 'text' and not text_content:
+            raise forms.ValidationError('Пожалуйста, введите текстовое содержимое.')
+        if content_type in ['file', 'image', 'video', 'audio'] and not content:
+            raise forms.ValidationError('Пожалуйста, загрузите файл для выбранного типа контента.')
+
+        return cleaned_data
+
+class CourseMaterialPreferenceForm(forms.ModelForm):
+    class Meta:
+        model = CourseMaterialPreference
+        fields = ['name']
         widgets = {
-            'content_type': forms.Select(attrs={'class': 'form-control'}),
-            'text_content': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
-            'content': forms.ClearableFileInput(attrs={'class': 'form-control-file'}),
-            'order_index': forms.NumberInput(attrs={'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
         }
         labels = {
-            'content_type': 'Тип контента',
-            'text_content': 'Текстовое содержимое',
-            'content': 'Файл',
-            'order_index': 'Порядок отображения',
+            'name': 'Название предпочтения',
+        }
+
+class PsychologicalTestResultForm(forms.ModelForm):
+    class Meta:
+        model = PsychologicalTestResult
+        fields = ['preference']
+        widgets = {
+            'preference': forms.Select(attrs={'class': 'form-control'}),
+        }
+        labels = {
+            'preference': 'Предпочтение',
         }
 
 class GroupForm(forms.ModelForm):
@@ -259,10 +313,9 @@ class GroupForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         super(GroupForm, self).__init__(*args, **kwargs)
         if user and not user.is_superuser:
-            # Ограничиваем список курсов только курсами текущего преподавателя
+            # Преподаватель может связывать группу только со своими курсами
             self.fields['courses'].queryset = Course.objects.filter(instructor=user)
         else:
-            # Администратор видит все курсы
             self.fields['courses'].queryset = Course.objects.all()
 
 class GroupMemberForm(forms.ModelForm):

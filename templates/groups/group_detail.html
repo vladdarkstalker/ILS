@@ -8,13 +8,15 @@
 <h2>Группа: {{ group.name }}</h2>
 
 <h3>Список участников</h3>
-{% if members.exists %}
+{% if members %}
     <table class="table table-striped">
         <thead>
             <tr>
                 <th>ФИО</th>
                 <th>Email</th>
+                <th>Номер группы</th>
                 <th>Дата рождения</th>
+                <!-- Добавьте другие столбцы по необходимости -->
                 <th>Действия</th>
             </tr>
         </thead>
@@ -23,12 +25,12 @@
                 <tr>
                     <td>{{ member.user.get_full_name }}</td>
                     <td>{{ member.user.email }}</td>
+                    <td>{{ member.user.group_number }}</td>
                     <td>{{ member.user.date_of_birth|date:"d.m.Y" }}</td>
+                    <!-- Добавьте другие поля по необходимости -->
                     <td>
-                        <a href="{% url 'learnsys:student_detail' pk=member.user.id %}">Подробнее</a>
-                        {% if is_instructor %}
-                            | <a href="{% url 'learnsys:download_student_info' pk=member.user.id %}">Скачать CSV</a>
-                        {% endif %}
+                        <a href="{% url 'learnsys:student_detail' pk=member.user.id %}">Подробнее</a> |
+                        <a href="{% url 'learnsys:download_student_info' pk=member.user.id %}">Скачать CSV</a>
                     </td>
                 </tr>
             {% endfor %}
@@ -37,6 +39,4 @@
 {% else %}
     <p>В этой группе пока нет участников.</p>
 {% endif %}
-
 {% endblock %}
-

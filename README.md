@@ -1,128 +1,274 @@
 # LearnSys
 
-LearnSys is a Django-based web application for managing educational courses, study groups, and user assessments. It offers functionality for different user roles, including administrators, instructors, and students.
+LearnSys — это веб-приложение на основе Django, предназначенное для управления образовательными курсами, учебными группами и оценкой пользователей. Оно предлагает функциональность для различных ролей пользователей, включая администраторов, инструкторов и студентов, предоставляя комплексную платформу для совместного обучения и отслеживания успеваемости.
 
-## Table of Contents
+## Содержание
 
-- [Features](#features)
-- [Technologies Used](#technologies-used)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-  - [Project Directory (`iis`)](#project-directory-iis)
-  - [Application Directory (`learnsys`)](#application-directory-learnsys)
-  - [Templates Directory](#templates-directory)
+- [Особенности](#особенности)
+- [Используемые Технологии](#используемые-технологии)
+- [Установка](#установка)
+- [Использование](#использование)
+- [Структура Проекта](#структура-проекта)
+  - [Директория Проекта (`iis`)](#директория-проекта-iis)
+  - [Директория Приложения (`learnsys`)](#директория-приложения-learnsys)
+  - [Директория Утилит (`utils`)](#директория-утилит-utils)
+  - [Директория Шаблонов](#директория-шаблонов)
+- [Вклад](#вклад)
 
-## Features
+## Особенности
 
-- **User Roles and Permissions**
-  - **Administrators** manage courses, instructors, students, and study groups.
-  - **Instructors** create courses, manage study groups, and handle course materials.
-  - **Students** enroll in study groups, view their courses, and complete assessments.
+- **Роли Пользователей и Права Доступа**
+  - **Администраторы**: Управляют курсами, инструкторами, студентами и учебными группами.
+  - **Инструкторы**: Создают и управляют курсами, обрабатывают учебные группы и контролируют учебные материалы.
+  - **Студенты**: Записываются в учебные группы, получают доступ к курсам, выполняют задания и отслеживают свою успеваемость.
 
-- **Course and Study Group Management**
-  - **Courses**: Create, update, delete, and manage content for courses.
-  - **Study Groups**: Group students by courses for collaborative learning.
+- **Управление Курсами и Учебными Группами**
+  - **Курсы**: Создание, обновление, удаление и управление контентом курсов.
+  - **Учебные Группы**: Организация студентов в группы для совместного обучения.
 
-- **Assessments and Progress Tracking**
-  - **Tests**: Instructors can create and manage various assessments.
-  - **Results**: Students can complete tests and track their progress.
+- **Оценки и Отслеживание Прогресса**
+  - **Тесты**: Инструкторы могут создавать и управлять различными оценками.
+  - **Результаты**: Студенты могут проходить тесты и отслеживать свою успеваемость.
+  - **Отслеживание Прогресса**: Мониторинг прогресса студентов по курсам и темам.
 
-## Technologies Used
+- **Обработка Контента**
+  - **Транскрипция Аудио**: Преобразование аудио/видео контента в текст с помощью OpenAI Whisper.
+  - **Перевод**: Перевод контента между языками.
+  - **Генерация Вопросов**: Автоматическая генерация вопросов и ответов из учебных материалов.
 
-- **Backend**: [Django](https://www.djangoproject.com/) (Python-based web framework)
-- **Database**: [SQLite](https://www.sqlite.org/index.html) (default for development)
-- **Frontend**: HTML5, minimal CSS (no comprehensive styling)
+## Используемые Технологии
 
-## Installation
+- **Backend**:
+  - [Django](https://www.djangoproject.com/) – Веб-фреймворк на Python
+  - [OpenAI Whisper](https://github.com/openai/whisper) – Автоматическое распознавание речи
+  - [Transformers](https://huggingface.co/transformers/) – NLP модели для генерации вопросов и перевода
 
-### Prerequisites
+- **Frontend**:
+  - HTML5, CSS3 – Основное оформление пользовательских интерфейсов
 
-- Python 3.10
-- `pip` package manager
+- **База Данных**:
+  - [SQLite](https://www.sqlite.org/index.html) – Стандартная база данных для разработки
 
-### Steps
+- **Дополнительные Библиотеки**:
+  - [PyTorch](https://pytorch.org/) – Фреймворк глубокого обучения
+  - [Pydub](https://github.com/jiaaro/pydub) – Манипуляция аудио
+  - [NLTK](https://www.nltk.org/) – Набор инструментов для обработки естественного языка
+  - [Langdetect](https://pypi.org/project/langdetect/) – Определение языка текста
+  - [Sentence Transformers](https://www.sbert.net/) – Векторные представления предложений
+  - [Scikit-learn](https://scikit-learn.org/) – Машинное обучение
+  - [Googletrans](https://py-googletrans.readthedocs.io/en/latest/) – API Google Translate
+  - [Celery](https://docs.celeryproject.org/en/stable/) – Асинхронная очередь задач (опционально)
 
-1. **Clone the Repository**
+## Установка
+
+### Требования
+
+- **Операционная Система**: Windows, macOS или Linux
+- **Python**: Версия 3.10 или выше
+- **FFmpeg**: Необходим для обработки аудио
+
+### Шаги
+
+1. **Клонирование Репозитория**
 
    ```bash
    git clone https://github.com/yourusername/learnsys.git
    cd learnsys
    ```
 
-2. **Create and Activate a Virtual Environment**
+2. **Установка FFmpeg**
 
+   FFmpeg необходим для обработки аудио/видео контента.
+
+   - **Windows**:
+     - Скачайте последнюю статическую сборку с [FFmpeg Download](https://www.gyan.dev/ffmpeg/builds/).
+     - Распакуйте содержимое в `C:\ffmpeg`.
+     - Добавьте `C:\ffmpeg\bin` в системную переменную PATH.
+   
+   - **macOS**:
+     ```bash
+     brew install ffmpeg
+     ```
+   
+   - **Linux (Ubuntu/Debian)**:
+     ```bash
+     sudo apt update
+     sudo apt install ffmpeg
+     ```
+
+   **Проверка установки**:
    ```bash
-   python -m venv env
+   ffmpeg -version
    ```
 
-   - **Windows**: `env\Scripts\activate`
-   - **macOS/Linux**: `source env/bin/activate`
+3. **Создание и Активация Виртуального Окружения**
 
-3. **Install Dependencies**
+   Рекомендуется использовать виртуальное окружение для управления зависимостями проекта.
+
+   ```bash
+   python -m venv venv
+   ```
+
+   - **Windows**:
+     ```bash
+     venv\Scripts\activate
+     ```
+   - **macOS/Linux**:
+     ```bash
+     source venv/bin/activate
+     ```
+
+4. **Обновление pip**
+
+   Убедитесь, что `pip` обновлен до последней версии.
+
+   ```bash
+   pip install --upgrade pip
+   ```
+
+5. **Установка Зависимостей**
+
+   Установите все необходимые Python-пакеты с помощью `pip`.
+
+   ```bash
+   pip install django
+   pip install torch
+   pip install torch-directml
+   pip install transformers
+   pip install openai-whisper
+   pip install pydub
+   pip install nltk
+   pip install langdetect
+   pip install sentence-transformers
+   pip install scikit-learn
+   pip install numpy
+   pip install googletrans==4.0.0-rc1
+   pip install farm-haystack
+   pip install celery  # Опционально, если используется Celery для асинхронных задач
+   ```
+
+   **Альтернативно**, можно использовать предоставленный `requirements.txt`:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Apply Migrations**
+6. **Загрузка Данных NLTK**
+
+   Некоторые функции библиотеки **nltk** требуют дополнительных данных.
+
+   ```bash
+   python -c "import nltk; nltk.download('punkt')"
+   ```
+
+7. **Применение Миграций**
+
+   Настройте базу данных.
 
    ```bash
    python manage.py makemigrations
    python manage.py migrate
    ```
 
-5. **Create a Superuser**
+8. **Создание Суперпользователя**
+
+   Настройте административную учетную запись.
 
    ```bash
    python manage.py createsuperuser
    ```
 
-6. **Run the Development Server**
+   Следуйте инструкциям для создания суперпользователя.
+
+9. **Запуск Сервер Разработки**
+
+   Запустите Django-сервер для проверки работоспособности приложения.
 
    ```bash
    python manage.py runserver
    ```
 
-   Visit `http://127.0.0.1:8000/` to access the application.
+   Перейдите по адресу `http://127.0.0.1:8000/` для доступа к приложению.
 
-## Usage
+## Использование
 
-1. **Admin Panel**: Navigate to `http://127.0.0.1:8000/admin/` to manage users, courses, and groups.
-2. **Instructor Dashboard**: Manage course materials, tests, and student groups.
-3. **Student Dashboard**: Access study materials, take tests, and track performance.
+1. **Административная Панель**
 
-## Project Structure
+   Перейдите на `http://127.0.0.1:8000/admin/` для управления пользователями, курсами и группами.
 
-### Project Directory (`iis`)
+2. **Панель Инструктора**
 
-Contains core settings and configuration for the Django project:
+   - Создание и управление курсами.
+   - Управление учебными группами и назначение студентов.
+   - Загрузка и обработка учебных материалов.
+   - Генерация и управление оценками.
 
-- **`settings.py`**: Main configuration for the project.
-- **`urls.py`**: URL routing for the project.
-- **`wsgi.py` & `asgi.py`**: Deployment settings for web servers.
-- **`context_processors.py`**: Custom context processors for templates.
+3. **Панель Студента**
 
-### Application Directory (`learnsys`)
+   - Доступ к зачисленным курсам и учебным материалам.
+   - Прохождение оценок и просмотр результатов.
+   - Отслеживание прогресса по курсам и темам.
 
-Handles the main application logic:
+4. **Обработка Контента**
 
-- **`admin.py`**: Customizes the Django admin interface for models.
-- **`models.py`**: Defines models for users, courses, groups, and tests.
-- **`views.py`**: Contains view logic for handling requests and responses.
-- **`forms.py`**: Forms for user input (e.g., login, group creation).
-- **`urls.py`**: URL patterns for routing within the `learnsys` app.
-- **`templatetags/`**: Custom template tags and filters to enhance templates.
+   - Загрузка аудио/видео файлов для транскрипции и перевода.
+   - Автоматическая генерация вопросов и ответов из учебных материалов.
 
-### Templates Directory
+## Структура Проекта
 
-HTML templates used for rendering the web application:
+### Директория Проекта (`iis`)
 
-- **`admin/`**: Custom admin interface templates.
-- **`groups/`**: Templates for managing study groups (list, create, edit).
-- **`courses/`**: Templates for course management (list, detail, create).
-- **`instructor/`**: Templates for instructor dashboards and student management.
-- **`student/`**: Templates for student dashboards and test views.
-- **`welcome.html`**: Home/landing page template for unauthenticated users.
+Содержит основные настройки и конфигурации для Django-проекта.
 
-> **Note**: The project is currently minimally styled. Future updates may include enhanced frontend styling and user interfaces.
+- **`settings.py`**: Основные настройки проекта.
+- **`urls.py`**: Маршрутизация URL-адресов для проекта.
+- **`wsgi.py` & `asgi.py`**: Конфигурации для развертывания на веб-серверах.
+- **`context_processors.py`**: Пользовательские контекстные процессоры для шаблонов.
+
+### Директория Приложения (`learnsys`)
+
+Отвечает за основную логику приложения и функциональности.
+
+- **`admin.py`**: Настройка интерфейса Django admin для моделей.
+- **`models.py`**: Определение моделей для пользователей, курсов, групп и оценок.
+- **`views.py`**: Логика представлений для обработки HTTP-запросов и ответов.
+- **`forms.py`**: Формы для ввода данных пользователями (например, вход, создание группы).
+- **`urls.py`**: Паттерны URL для маршрутизации внутри приложения `learnsys`.
+- **`mixins.py`**: Пользовательские миксины для разрешений и функциональностей представлений.
+- **`utils/`**: Модули утилит для обработки контента, генерации вопросов и перевода.
+
+### Директория Утилит (`utils`)
+
+Содержит вспомогательные скрипты, поддерживающие различные бэкенд-функции.
+
+- **`content_processing.py`**: Обработка аудио транскрипции, перевод и генерация текста.
+- **`question_generation.py`**: Управление генерацией вопросов и ответов из текста.
+- **`question_answer_generation.py`**: Реализация продвинутых пайплайнов вопросов и ответов.
+- **`translate_text.py`**: Предоставление сервисов перевода между языками.
+
+### Директория Шаблонов
+
+HTML-шаблоны, используемые для рендеринга веб-приложения.
+
+- **`admin/`**: Шаблоны для интерфейса администратора.
+- **`groups/`**: Шаблоны для управления учебными группами (список, создание, редактирование).
+- **`courses/`**: Шаблоны для управления курсами (список, детальный вид, создание).
+- **`instructor/`**: Шаблоны для панелей инструментов инструкторов и управления студентами.
+- **`student/`**: Шаблоны для панелей инструментов студентов и просмотра тестов.
+- **`topics/`**: Шаблоны для управления темами курсов и контентом.
+- **`tests/`**: Шаблоны для создания, управления тестами и просмотра результатов.
+- **`registration/`**: Шаблоны для аутентификации пользователей (вход, регистрация).
+- **`profile/`**: Шаблоны для профилей пользователей и настроек.
+- **`welcome.html`**: Главная/лендинг страница для неаутентифицированных пользователей.
+
+> **Примечание**: Проект в настоящее время имеет минимальное оформление. В будущих обновлениях может быть добавлено улучшенное оформление и пользовательские интерфейсы.
+
+## Вклад
+
+Вклады приветствуются! Пожалуйста, форкните репозиторий и отправьте пул-реквест с вашими улучшениями.
+
+1. **Форкните Репозиторий**
+2. **Создайте Новую Ветку**
+3. **Внесите Изменения и Зафиксируйте Их**
+4. **Отправьте Изменения в Ветку**
+5. **Откройте Пул-реквест**

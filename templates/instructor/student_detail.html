@@ -7,14 +7,9 @@
 {% block content %}
 <h2>Студент: {{ student.get_full_name }}</h2>
 <p><strong>Email:</strong> {{ student.email }}</p>
-<p><strong>Номер группы:</strong>
-    {% if student_group %}
-        {{ student_group.name }}
-    {% else %}
-        Не состоит в группе
-    {% endif %}
-</p>
+<p><strong>Номер группы:</strong> {{ group_number }}</p>
 <p><strong>Дата рождения:</strong> {{ date_of_birth|date:"d.m.Y" }}</p>
+<p><strong>Предпочтение учебных материалов:</strong> {{ material_preference }}</p>
 
 {% if course_stats_list %}
     {% for course_stat in course_stats_list %}
@@ -28,30 +23,22 @@
                 <thead>
                     <tr>
                         <th>Тест</th>
-                        <th>Попытка</th>
                         <th>Результат</th>
                         <th>Дата прохождения</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in course_stat.test_results_list %}
-                        {% if item.test_results.exists %}
-                            {% for result in item.test_results %}
-                                <tr>
-                                    <td>{{ item.test.title }}</td>
-                                    <td>{{ forloop.parentloop.counter }}</td>
-                                    <td>{{ result.score }} / {{ result.total_questions }}</td>
-                                    <td>{{ result.date_taken|date:"d.m.Y H:i" }}</td>
-                                </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td>{{ item.test.title }}</td>
-                                <td>-</td>
+                        <tr>
+                            <td>{{ item.test.title }}</td>
+                            {% if item.test_result %}
+                                <td>{{ item.test_result.score }} / {{ item.test_result.total_questions }}</td>
+                                <td>{{ item.test_result.date_taken|date:"d.m.Y H:i" }}</td>
+                            {% else %}
                                 <td>Не пройден</td>
                                 <td>-</td>
-                            </tr>
-                        {% endif %}
+                            {% endif %}
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -64,4 +51,3 @@
 {% endif %}
 
 {% endblock %}
-

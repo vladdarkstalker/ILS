@@ -2,37 +2,63 @@
 
 {% extends 'base.html' %}
 
-{% block title %}{% if form.instance.pk %}Редактировать материал{% else %}Добавить материал{% endif %}{% endblock %}
+{% block title %}
+    {% if form.instance.pk %}
+        Редактировать материал
+    {% else %}
+        Добавить материал
+    {% endif %}
+{% endblock %}
 
 {% block content %}
-<h2>{% if form.instance.pk %}Редактировать материал{% else %}Добавить материал{% endif %}</h2>
+<h2>
+    {% if form.instance.pk %}
+        Редактировать материал
+    {% else %}
+        Добавить материал
+    {% endif %}
+</h2>
 
-<form method="post" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data" id="contentForm">
     {% csrf_token %}
     {{ form.non_field_errors }}
 
     <div class="form-group">
         {{ form.content_type.label_tag }} {{ form.content_type }}
+        <small class="form-text text-muted">Выберите тип контента: текст или файл.</small>
     </div>
 
     <div class="form-group" id="text_content_field">
         {{ form.text_content.label_tag }} {{ form.text_content }}
         {{ form.text_content.errors }}
+        <small class="form-text text-muted">Введите текстовый контент.</small>
     </div>
 
     <div class="form-group" id="content_field">
         {{ form.content.label_tag }} {{ form.content }}
         {{ form.content.errors }}
+        <small class="form-text text-muted">Загрузите файл с контентом (аудио или видео).</small>
     </div>
 
     <div class="form-group">
         {{ form.order_index.label_tag }} {{ form.order_index }}
         {{ form.order_index.errors }}
+        <small class="form-text text-muted">Укажите порядковый номер материала в теме.</small>
     </div>
 
-    <button type="submit" class="btn btn-success">{% if form.instance.pk %}Сохранить{% else %}Добавить{% endif %}</button>
+    <button type="submit" class="btn btn-success" id="submitButton">
+        {% if form.instance.pk %}Сохранить{% else %}Добавить{% endif %}
+    </button>
     <a href="{% url 'learnsys:topic_detail' topic.id %}" class="btn btn-secondary">Отмена</a>
 </form>
+
+<!-- Индикатор загрузки -->
+<div id="loadingIndicator" style="display: none; margin-top: 20px;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="sr-only">Загрузка...</span>
+    </div>
+    <span>Идёт загрузка и обработка контента. Пожалуйста, подождите...</span>
+</div>
 
 <script>
     function updateContentFields() {
@@ -53,5 +79,15 @@
 
     // Вызываем функцию при загрузке страницы
     updateContentFields();
+
+    // Добавляем обработчик события при отправке формы
+    document.getElementById('contentForm').addEventListener('submit', function(e) {
+        var submitButton = document.getElementById('submitButton');
+        var loadingIndicator = document.getElementById('loadingIndicator');
+
+        // Блокируем кнопку и показываем индикатор загрузки
+        submitButton.disabled = true;
+        loadingIndicator.style.display = 'block';
+    });
 </script>
 {% endblock %}
