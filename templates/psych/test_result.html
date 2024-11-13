@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Результаты теста {{ test.name }}</title>
+</head>
+<body>
+    <h1>Результаты теста: {{ test.name }} (Форма {{ test.form }})</h1>
+    <ul>
+        {% for result in results %}
+            <li>Фактор {{ result.factor }}: {{ result.result }}</li>
+        {% endfor %}
+    </ul>
+    <a href="{% url 'psych_test_list' %}">Вернуться к списку тестов</a>
+</body>
+</html>

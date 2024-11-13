@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Прохождение теста {{ test.name }}</title>
+</head>
+<body>
+    <h1>{{ test.name }} (Форма {{ test.form }})</h1>
+    <form method="post" action="{% url 'psych_take_test' test.id %}">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Завершить тест</button>
+    </form>
+</body>
+</html>

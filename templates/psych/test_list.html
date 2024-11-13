@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Список тестов</title>
+</head>
+<body>
+    <h1>Доступные тесты</h1>
+    <ul>
+        {% for test in tests %}
+            <li>
+                <a href="{% url 'psych_take_test' test.id %}">{{ test.name }} ({{ test.form }})</a>
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

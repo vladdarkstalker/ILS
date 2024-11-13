@@ -313,3 +313,25 @@ class TestRetakePermission(models.Model):
     def __str__(self):
         status = "Разрешено" if self.allowed else "Запрещено"
         return f"{self.user.get_full_name()} - {self.test.title}: {status}"
+
+
+class PsychTest(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField()
+
+class PsychQuestion(models.Model):
+    test = models.ForeignKey(PsychTest, on_delete=models.CASCADE, related_name='questions')
+    text = models.TextField()
+    factor = models.CharField(max_length=2)  # Например, A, B, C, D...
+
+class PsychAnswer(models.Model):
+    question = models.ForeignKey(PsychQuestion, on_delete=models.CASCADE, related_name='answers')
+    text = models.TextField()
+    score = models.IntegerField()
+
+class PsychTestResult(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='test_results')
+    test = models.ForeignKey(PsychTest, on_delete=models.CASCADE, related_name='results')
+    factor = models.CharField(max_length=2)
+    result = models.FloatField()
+    date_taken = models.DateTimeField(auto_now_add=True)
