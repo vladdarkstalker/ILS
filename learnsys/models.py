@@ -317,7 +317,7 @@ class TestRetakePermission(models.Model):
 
 class PsychTest(models.Model):
     name = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.TextField(null=True)
 
 class PsychQuestion(models.Model):
     test = models.ForeignKey(PsychTest, on_delete=models.CASCADE, related_name='questions')

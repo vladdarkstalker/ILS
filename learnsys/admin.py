@@ -7,7 +7,8 @@ from django.utils.text import Truncator
 from .models import (
     User, Course, Topic, StudyGroup, GroupMember,
     CourseMaterialPreference, TopicContent, Test, TestItem, TestItemOption,
-    PsychologicalTestResult, TestResult, UserTestAnswer, TopicProgress, TestRetakePermission
+    PsychologicalTestResult, TestResult, UserTestAnswer, TopicProgress, TestRetakePermission,
+    PsychTest, PsychQuestion, PsychAnswer, PsychTestResult
 )
 
 # Отменяем регистрацию встроенной модели Group (группы прав)
@@ -182,3 +183,33 @@ class UserTestAnswerAdmin(admin.ModelAdmin):
     def user_full_name(self, obj):
         return obj.user.get_full_name()
     user_full_name.short_description = 'Пользователь'
+
+# Регистрация модели PsychTest
+class PsychTestAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')  # Отображаемые поля
+    search_fields = ('name',)  # Поле для поиска
+    list_filter = ('name',)  # Фильтры
+
+# Регистрация модели PsychQuestion
+class PsychQuestionAdmin(admin.ModelAdmin):
+    list_display = ('text', 'factor', 'test')  # Отображаемые поля
+    search_fields = ('text',)  # Поле для поиска
+    list_filter = ('factor', 'test')  # Фильтры
+
+# Регистрация модели PsychAnswer
+class PsychAnswerAdmin(admin.ModelAdmin):
+    list_display = ('text', 'score', 'question')  # Отображаемые поля
+    search_fields = ('text',)  # Поле для поиска
+    list_filter = ('score', 'question')  # Фильтры
+
+# Регистрация модели PsychTestResult
+class PsychTestResultAdmin(admin.ModelAdmin):
+    list_display = ('user', 'test', 'factor', 'result', 'date_taken')  # Отображаемые поля
+    search_fields = ('user__username',)  # Поле для поиска
+    list_filter = ('test', 'factor', 'date_taken')  # Фильтры
+
+# Регистрируем модели
+admin.site.register(PsychTest, PsychTestAdmin)
+admin.site.register(PsychQuestion, PsychQuestionAdmin)
+admin.site.register(PsychAnswer, PsychAnswerAdmin)
+admin.site.register(PsychTestResult, PsychTestResultAdmin)

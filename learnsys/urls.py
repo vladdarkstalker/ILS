@@ -87,6 +87,6 @@ urlpatterns = [
     # Психтесты
     path('psych_tests/', views.psych_test_list, name='psych_test_list'),
     path('psych_tests/<int:test_id>/', views.psych_take_test, name='psych_take_test'),
-    path('psych_tests/<int:test_id>/results/', views.psych_test_results, name='psych_test_results'),
+    path('psych_tests/<int:test_id>/results/', views.psych_test_results, name='psych_test_result'),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

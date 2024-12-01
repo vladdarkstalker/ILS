@@ -50,7 +50,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from .models import PsychTest, PsychQuestion, PsychTestResult
 from .forms import PsychTestForm
-from .utils import calculate_factors
+from .utils.calculate_factors import calculate_factors
 
 logger = logging.getLogger('learnsys')
 
@@ -1501,24 +1501,41 @@ def psych_test_list(request):
 def psych_take_test(request, test_id):
     test = get_object_or_404(PsychTest, id=test_id)
     questions = test.questions.prefetch_related('answers')
+
     if request.method == 'POST':
         form = PsychTestForm(request.POST, questions=questions)
         if form.is_valid():
             user_answers = {int(key.split('_')[1]): int(value) for key, value in form.cleaned_data.items()}
-            result_data = calculate_factors(user_answers, test)
+
+            # Определяем, какие факторы пересчитать
+            target_factors = test.questions.values_list('factor', flat=True).distinct()
+
+            # Вызываем calculate_factors с ограничением на факторы
+            result_data = calculate_factors(user_answers, test, target_factors)
+
             for factor, result in result_data.items():
-                PsychTestResult.objects.create(
-                    user=request.user,
-                    test=test,
-                    factor=factor,
-                    result=result
-                )
-            return redirect('psych_test_results', test_id=test.id)
+                existing_result = PsychTestResult.objects.filter(
+                    user=request.user, test=test, factor=factor
+                ).first()
+
+                if existing_result:
+                    existing_result.result = result
+                    existing_result.save()
+                else:
+                    PsychTestResult.objects.create(
+                        user=request.user,
+                        test=test,
+                        factor=factor,
+                        result=result
+                    )
+
+            return redirect('learnsys:psych_test_result', test_id=test.id)
     else:
         form = PsychTestForm(questions=questions)
+
     return render(request, 'psych/take_test.html', {'form': form, 'test': test})
 
 def psych_test_results(request, test_id):
     test = get_object_or_404(PsychTest, id=test_id)
     results = PsychTestResult.objects.filter(user=request.user, test=test)
-    return render(request, 'psych/test_results.html', {'test': test, 'results': results})
+    return render(request, 'psych/test_result.html', {'test': test, 'results': results})

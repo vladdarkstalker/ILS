@@ -9,7 +9,7 @@
     <ul>
         {% for test in tests %}
             <li>
-                <a href="{% url 'psych_take_test' test.id %}">{{ test.name }} ({{ test.form }})</a>
+                <a href="{% url 'learnsys:psych_take_test' test.id %}">{{ test.name }} ({{ test.form }})</a>
             </li>
         {% endfor %}
     </ul>
