@@ -335,3 +335,22 @@ class PsychTestResult(models.Model):
     factor = models.CharField(max_length=2)
     result = models.FloatField()
     date_taken = models.DateTimeField(auto_now_add=True)
+
+    from django.db import models
+
+from django.db import models
+
+from django.db import models
+
+class FactorInterpretation(models.Model):
+    factor_code = models.CharField(max_length=10, unique=True)
+    factor_name = models.CharField(max_length=100)
+    value_interpretations = models.JSONField(default=dict)
+
+    def get_interpretation(self, value):
+        for interpretation in self.value_interpretations:
+            min_value = interpretation['min_value']
+            max_value = interpretation['max_value']
+            if min_value <= value <= max_value:
+                return interpretation['text']
+        return "Интерпретация не найдена"

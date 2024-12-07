@@ -1539,3 +1539,32 @@ def psych_test_results(request, test_id):
     test = get_object_or_404(PsychTest, id=test_id)
     results = PsychTestResult.objects.filter(user=request.user, test=test)
     return render(request, 'psych/test_result.html', {'test': test, 'results': results})
+
+
+def interpret_factor(factor_code, result):
+    try:
+        interpretation = FactorInterpretation.objects.get(factor_code=factor_code)
+        for value_range in interpretation.value_interpretations:
+            if value_range['min_value'] <= result <= value_range['max_value']:
+                return interpretation.factor_name, value_range['text']
+    except FactorInterpretation.DoesNotExist:
+        return factor_code, "Интерпретация отсутствует"
+    return factor_code, "Неизвестное значение"
+
+def all_test_results(request):
+    user = request.user
+    results = PsychTestResult.objects.filter(user=user).order_by('test', 'factor')
+
+    interpreted_results = [
+        {
+            'test_name': result.test.name,
+            'factor_code': result.factor,
+            'result': result.result,
+            'interpretation': interpret_factor(result.factor, result.result),
+            'date_taken': result.date_taken
+        }
+        for result in results
+    ]
+
+    context = {'results': interpreted_results}
+    return render(request, 'psych/all_test_results.html', context)

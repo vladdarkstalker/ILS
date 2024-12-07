@@ -12,6 +12,7 @@
                 <a href="{% url 'learnsys:psych_take_test' test.id %}">{{ test.name }} ({{ test.form }})</a>
             </li>
         {% endfor %}
+        <a href="{% url 'learnsys:student_dashboard' %}">Вернуться в дашборд</a><br>
     </ul>
 </body>
 </html>

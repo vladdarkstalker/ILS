@@ -8,7 +8,7 @@ from .models import (
     User, Course, Topic, StudyGroup, GroupMember,
     CourseMaterialPreference, TopicContent, Test, TestItem, TestItemOption,
     PsychologicalTestResult, TestResult, UserTestAnswer, TopicProgress, TestRetakePermission,
-    PsychTest, PsychQuestion, PsychAnswer, PsychTestResult
+    PsychTest, PsychQuestion, PsychAnswer, PsychTestResult, FactorInterpretation
 )
 
 # Отменяем регистрацию встроенной модели Group (группы прав)
@@ -213,3 +213,9 @@ admin.site.register(PsychTest, PsychTestAdmin)
 admin.site.register(PsychQuestion, PsychQuestionAdmin)
 admin.site.register(PsychAnswer, PsychAnswerAdmin)
 admin.site.register(PsychTestResult, PsychTestResultAdmin)
+from django.contrib import admin
+from .models import FactorInterpretation
+
+@admin.register(FactorInterpretation)
+class FactorInterpretationAdmin(admin.ModelAdmin):
+    list_display = ('factor_code', 'factor_name')
