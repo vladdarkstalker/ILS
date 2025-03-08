@@ -336,12 +336,6 @@ class PsychTestResult(models.Model):
     result = models.FloatField()
     date_taken = models.DateTimeField(auto_now_add=True)
 
-    from django.db import models
-
-from django.db import models
-
-from django.db import models
-
 class FactorInterpretation(models.Model):
     factor_code = models.CharField(max_length=10, unique=True)
     factor_name = models.CharField(max_length=100)

@@ -51,6 +51,7 @@ from django.contrib.auth.decorators import login_required
 from .models import PsychTest, PsychQuestion, PsychTestResult
 from .forms import PsychTestForm
 from .utils.calculate_factors import calculate_factors
+from .utils.interpretation_utils import interpret_educational_guidance
 
 logger = logging.getLogger('learnsys')
 
@@ -1565,6 +1566,26 @@ def all_test_results(request):
         }
         for result in results
     ]
+    # Преобразуем в словарь {factor_code: result_value}
+    factor_results = {result['factor_code']: result['result'] for result in interpreted_results}
 
-    context = {'results': interpreted_results}
+    # Вызываем интерпретатор образовательных рекомендаций
+    guidance_data = interpret_educational_guidance(factor_results)
+
+    educational_guidance = [
+        {
+            'factor_code': factor_code,
+            'factor_name': guidance['factor_name'],
+            'teacher_support': guidance['teacher_support'],
+            'feedback': guidance['feedback'],
+            'community': guidance['community'],
+        }
+        for factor_code, guidance in guidance_data.items()
+    ]
+
+    context = {
+        'results': interpreted_results,
+        'guidance': educational_guidance,
+    }
+
     return render(request, 'psych/all_test_results.html', context)

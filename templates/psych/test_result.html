@@ -5,7 +5,7 @@
     <title>Результаты теста {{ test.name }}</title>
 </head>
 <body>
-    <h1>Результаты теста: {{ test.name }} (Форма {{ test.form }})</h1>
+    <h1>Результаты теста: {{ test.name }}</h1>
     <ul>
         {% for result in results %}
             <li>Фактор {{ result.factor }}: {{ result.result }}</li>
