@@ -1552,40 +1552,51 @@ def interpret_factor(factor_code, result):
         return factor_code, "Интерпретация отсутствует"
     return factor_code, "Неизвестное значение"
 
+
 def all_test_results(request):
     user = request.user
     results = PsychTestResult.objects.filter(user=user).order_by('test', 'factor')
 
+    factor_results = {}  # Основные результаты (A1, A2, A3...)
+    guidance_results = {}  # Рекомендации (A1T, A1R, A1C...)
+
+    # Разделяем факторы и рекомендации
+    for result in results:
+        if result.factor.endswith(("T", "R", "C")):
+            guidance_results[result.factor] = result.result
+        else:
+            factor_results[result.factor] = result.result
+
+    # Обрабатываем основную интерпретацию (таблица 1)
     interpreted_results = [
         {
             'test_name': result.test.name,
             'factor_code': result.factor,
+            'factor_name': interpret_factor(result.factor, result.result)[0],  # Имя фактора
             'result': result.result,
-            'interpretation': interpret_factor(result.factor, result.result),
+            'interpretation': interpret_factor(result.factor, result.result)[1],  # Интерпретация значения
             'date_taken': result.date_taken
         }
-        for result in results
+        for result in results if result.factor in factor_results
     ]
-    # Преобразуем в словарь {factor_code: result_value}
-    factor_results = {result['factor_code']: result['result'] for result in interpreted_results}
 
-    # Вызываем интерпретатор образовательных рекомендаций
-    guidance_data = interpret_educational_guidance(factor_results)
-
-    educational_guidance = [
-        {
-            'factor_code': factor_code,
-            'factor_name': guidance['factor_name'],
-            'teacher_support': guidance['teacher_support'],
-            'feedback': guidance['feedback'],
-            'community': guidance['community'],
-        }
-        for factor_code, guidance in guidance_data.items()
-    ]
+    # Обрабатываем образовательные рекомендации (таблица 2)
+    guidance_interpretation = interpret_educational_guidance(guidance_results)
+    guidance_list = list(guidance_interpretation.values())
 
     context = {
         'results': interpreted_results,
-        'guidance': educational_guidance,
+        'guidance': guidance_list,  # Передаём рекомендации в шаблон
     }
-
     return render(request, 'psych/all_test_results.html', context)
+
+
+
+
+
+
+
+
+
+
+

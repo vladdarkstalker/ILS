@@ -19,9 +19,9 @@
         {% for result in results %}
         <tr>
             <td>{{ result.test_name }}</td>
-            <td>{{ result.interpretation.0 }} ({{ result.factor_code }})</td>
-            <td>{{ result.result|default:"Неизвестно" }}</td>
-            <td>{{ result.interpretation.1 }}</td>
+            <td>{{ result.factor_name }}</td>  <!-- Показываем название фактора -->
+            <td>{{ result.result }}</td>
+            <td>{{ result.interpretation }}</td>
             <td>{{ result.date_taken|date:"d.m.Y H:i" }}</td>
         </tr>
         {% empty %}
@@ -31,7 +31,8 @@
         {% endfor %}
     </tbody>
 </table>
-<h3>Образовательные рекомендации</h3>
+
+<h2>Образовательные рекомендации</h2>
 <table>
     <thead>
         <tr>
@@ -42,12 +43,12 @@
         </tr>
     </thead>
     <tbody>
-        {% for guidance_data in guidance %}
+        {% for item in guidance %}
         <tr>
-            <td>{{ guidance_data.factor_name }}</td>
-            <td>{{ guidance_data.teacher_support }}</td>
-            <td>{{ guidance_data.feedback }}</td>
-            <td>{{ guidance_data.community }}</td>
+            <td>{{ item.factor_name }}</td>
+            <td>{{ item.T }}</td>
+            <td>{{ item.R }}</td>
+            <td>{{ item.C }}</td>
         </tr>
         {% empty %}
         <tr>
@@ -56,6 +57,7 @@
         {% endfor %}
     </tbody>
 </table>
+
 
 <a href="{% url 'learnsys:student_dashboard' %}">Вернуться в дашборд</a><br>
 <a href="{% url 'learnsys:psych_test_list' %}">Перейти к тестированиям</a>

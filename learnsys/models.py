@@ -342,6 +342,7 @@ class FactorInterpretation(models.Model):
     value_interpretations = models.JSONField(default=dict)
 
     def get_interpretation(self, value):
+        """Возвращает интерпретацию психологического фактора по значению."""
         for interpretation in self.value_interpretations:
             min_value = interpretation['min_value']
             max_value = interpretation['max_value']
