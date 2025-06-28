@@ -10,15 +10,28 @@
 {% if tests %}
     <ul class="list-group">
         {% for test in tests %}
+<<<<<<< Updated upstream
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 <a href="{% url 'learnsys:test_detail' test.id %}">{{ test.title }}</a>
                 {% if is_instructor %}
                     <!-- Links for editing or deleting the test -->
                     <a href="{% url 'learnsys:test_update' test.id %}" class="btn btn-warning btn-sm">Редактировать</a>
                     <form method="post" action="{% url 'learnsys:test_delete' test.id %}" style="display: inline;" onsubmit="return confirm('Вы уверены, что хотите удалить этот тест?');">
+=======
+            <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                <div class="mb-2 mb-md-0">
+                    <a href="{% url 'learnsys:test_detail' test.id %}">{{ test.title }}</a>
+                </div>
+                {% if user.is_authenticated and is_instructor %}
+                <div class="btn-group btn-group-sm" role="group">
+                    <a href="{% url 'learnsys:test_update' test.id %}" class="btn btn-warning">Редактировать</a>
+                    <form method="post" action="{% url 'learnsys:test_delete' test.id %}" onsubmit="return confirm('Вы уверены, что хотите удалить этот тест?');" style="display:inline;">
+>>>>>>> Stashed changes
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-danger btn-sm">Удалить</button>
+                        <button type="submit" class="btn btn-danger">Удалить</button>
                     </form>
+                    <a href="{% url 'learnsys:manage_test_retakes' test_id=test.id %}" class="btn btn-secondary">Повторы</a>
+                </div>
                 {% endif %}
             </li>
         {% endfor %}
@@ -28,19 +41,22 @@
 {% endif %}
 
 {% if is_instructor %}
+<<<<<<< Updated upstream
     <div class="mb-3">
         {% if not topic.tests.exists %}
             <form method="post" action="{% url 'learnsys:generate_questions' topic.id %}">
+=======
+    <div class="mt-4">
+        {% if has_content %}
+            <form method="post" action="{% url 'learnsys:generate_test' pk=topic.id %}" class="mb-2">
+>>>>>>> Stashed changes
                 {% csrf_token %}
-                <button type="submit" class="btn btn-primary">Сгенерировать Тест по Теме</button>
+                <button type="submit" class="btn btn-primary">Сгенерировать тест по теме</button>
             </form>
         {% else %}
-            <p>Автоматический Тест уже создан для этой темы.</p>
+            <p class="text-danger">Контент отсутствует. Невозможно сгенерировать тест.</p>
         {% endif %}
     </div>
-    <a href="{% url 'learnsys:test_create' topic_id=topic.id %}" class="btn btn-success mt-3">
-        Создать новый тест
-    </a>
 {% endif %}
 
 <a href="{% url 'learnsys:topic_detail' topic.id %}" class="btn btn-secondary mt-3">Назад к теме</a>

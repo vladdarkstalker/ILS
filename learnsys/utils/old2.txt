@@ -1,0 +1,276 @@
+# learnsys/utils/question_generation_full.py
+
+import logging
+import traceback
+import nltk
+import html
+import re
+import random
+from concurrent.futures import ThreadPoolExecutor
+from langdetect import detect
+from razdel import sentenize, tokenize
+from wordfreq import zipf_frequency
+import pymorphy2
+from sentence_transformers import SentenceTransformer, util
+from sklearn.cluster import DBSCAN
+from transformers import MarianMTModel, MarianTokenizer
+
+nltk.data.path.append('/home/vladdarkstalker/nltk_data')
+logger = logging.getLogger("learnsys")
+
+# Модель перевода
+model_name = 'Helsinki-NLP/opus-mt-en-ru'
+translator_tokenizer = MarianTokenizer.from_pretrained(model_name)
+translator_model = MarianMTModel.from_pretrained(model_name)
+translator_model.eval()
+
+# Эмбеддинг модель
+embedding_model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+morph = pymorphy2.MorphAnalyzer()
+
+RUS_BAD_RE = re.compile(r'(.)\1\1|\d|(?:[A-ZА-Я]{4,})')
+
+from .llm_generation import generate_questions_from_paragraph
+# Добавлено подключение paraphrase model
+from transformers import T5ForConditionalGeneration, T5Tokenizer
+
+paraphrase_tokenizer = T5Tokenizer.from_pretrained("IlyaGusev/rut5_base_sum_gazeta")
+paraphrase_model = T5ForConditionalGeneration.from_pretrained("IlyaGusev/rut5_base_sum_gazeta")
+
+def paraphrase_with_context(paragraph, question):
+    prompt = f"Сделай этот вопрос понятным студенту и логически связанным с текстом: {paragraph} Вопрос: {question}"
+    inputs = paraphrase_tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
+    outputs = paraphrase_model.generate(**inputs, max_new_tokens=64, num_beams=5)
+    result = paraphrase_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+    if not result or result.lower() in {"всё в порядке", "все в порядке"} or len(result.split()) < 5:
+        return question
+    return result
+
+def smart_question_refine(question, paragraph, key_sentence):
+    # Базовая фильтрация мусора
+    if len(question.split()) < 3:
+        return None  # выкидываем слишком короткие
+    if len(set(question.lower().split())) < 3:
+        return None  # выкидываем однообразные фразы
+
+    # Проверка на повторяемость слов
+    words = question.lower().split()
+    for w in set(words):
+        if words.count(w) > 4:
+            return None  # выкидываем мусор
+
+    # Семантическая проверка вопроса и key_sentence
+    question_emb = embedding_model.encode(question, convert_to_tensor=True)
+    key_emb = embedding_model.encode(key_sentence, convert_to_tensor=True)
+    sim_score = util.pytorch_cos_sim(question_emb, key_emb)[0][0].item()
+
+    # Если вопрос слишком далёк по смыслу — пытаемся перефразировать
+    if sim_score < 0.4:
+        refined_q = paraphrase_with_context(paragraph, question)
+        if refined_q != question:
+            return refined_q
+
+    # Если всё хорошо, оставляем как есть
+    return question
+
+def generate_distractors_by_context(correct_answer, candidates, paragraph, num_distractors=3):
+    correct_emb = embedding_model.encode(correct_answer, convert_to_tensor=True)
+    paragraph_emb = embedding_model.encode(paragraph, convert_to_tensor=True)
+
+    filtered = []
+    for cand in candidates:
+        cand_clean = clean_statement(cand)
+        cand_emb = embedding_model.encode(cand_clean, convert_to_tensor=True)
+
+        sim_to_correct = util.pytorch_cos_sim(cand_emb, correct_emb)[0][0].item()
+        sim_to_context = util.pytorch_cos_sim(cand_emb, paragraph_emb)[0][0].item()
+
+        if 0.2 < sim_to_context < 0.7 and 0.2 < sim_to_correct < 0.7:
+            filtered.append((abs(sim_to_correct - 0.5), cand_clean))
+
+    filtered = sorted(filtered, key=lambda x: x[0])
+
+    unique = []
+    seen = set()
+    for _, d in filtered:
+        if d.lower() not in seen:
+            unique.append(d)
+            seen.add(d.lower())
+        if len(unique) >= num_distractors:
+            break
+
+    return unique
+
+def generate_question_by_key_sentence(key_sentence):
+    keywords = [w for w in key_sentence.split() if len(w) > 3][:5]
+
+    if any(kw.lower() in key_sentence.lower() for kw in ["принцип", "основа", "базируется"]):
+        return "На каких принципах основывается искусственный интеллект?"
+    elif any(kw.lower() in key_sentence.lower() for kw in ["используется", "применяется", "находит"]):
+        return "Для чего используется искусственный интеллект в данном контексте?"
+    elif any(kw.lower() in key_sentence.lower() for kw in ["развитие", "совершенствование"]):
+        return "Какие направления развития искусственного интеллекта упоминаются в тексте?"
+    else:
+        return f"Что говорится о {keywords[0]} в тексте?" if keywords else "О чём говорится в тексте?"
+
+def translate(text, src_lang='en', dest_lang='ru'):
+    if src_lang == dest_lang:
+        return text
+    try:
+        inputs = translator_tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+        translated = translator_model.generate(**inputs)
+        return translator_tokenizer.decode(translated[0], skip_special_tokens=True)
+    except Exception as e:
+        logger.error(f"Ошибка при переводе: {e}")
+        return text
+
+def classify_question_type(answer_text, distractors):
+    if distractors:
+        return 'multiple_choice' if len(distractors) >= 2 else 'single_choice'
+    if len(answer_text.split()) <= 3:
+        return 'single_choice'
+    return 'text'
+
+def sentence_quality(sent, correct_emb, max_len=20):
+    sent = sent.strip()
+    if not sent:
+        return 0.0
+    if re.search(r"\d", sent) or re.search(r"(.)\1\1", sent):
+        return 0.0
+    if len(set(sent.lower().split())) < 3:
+        return 0.0
+    tokens = [t.text for t in tokenize(sent) if t.text.isalpha()]
+    if not (3 <= len(tokens) <= max_len):
+        return 0.0
+    mean_freq = sum(zipf_frequency(w.lower(), 'ru') for w in tokens) / len(tokens)
+    if mean_freq < 3.0:
+        return 0.0
+    emb = embedding_model.encode(sent, convert_to_tensor=True)
+    sim = util.pytorch_cos_sim(emb, correct_emb)[0][0].item()
+    if sim > 0.9:
+        return 0.0
+    has_verb = any('VERB' in morph.parse(w)[0].tag for w in tokens)
+    bonus = 0.15 if has_verb else 0.0
+    return max(0.0, (1 - sim) + bonus)
+
+def generate_distractors(correct_answer, distractor_pool, num_distractors=3):
+    correct_emb = embedding_model.encode(correct_answer, convert_to_tensor=True)
+    candidates = [(sentence_quality(s, correct_emb), s) for s in distractor_pool]
+    candidates = [s for score, s in sorted(candidates, reverse=True) if score > 0.3]
+    unique = []
+    for c in candidates:
+        norm = clean_statement(c)
+        if norm not in unique:
+            unique.append(norm)
+        if len(unique) >= num_distractors:
+            break
+    return unique
+
+def cluster_questions(qas, eps=0.5):
+    if not qas:
+        return []
+    embeddings = embedding_model.encode([qa['question'] for qa in qas])
+    labels = DBSCAN(eps=eps, min_samples=1, metric='cosine').fit(embeddings).labels_
+    seen = set()
+    return [qas[i] for i, lbl in enumerate(labels) if lbl not in seen and not seen.add(lbl)]
+
+def split_into_paragraphs(text):
+    paragraphs = [p.strip() for p in re.split(r'\n{2,}', text) if len(p.strip()) >= 100]
+    return paragraphs
+
+def get_key_sentence(paragraph):
+    sentences = [s.text.strip() for s in sentenize(paragraph)]
+    if not sentences:
+        return paragraph
+    para_emb = embedding_model.encode(paragraph, convert_to_tensor=True)
+    scored = [
+        (util.pytorch_cos_sim(embedding_model.encode(s, convert_to_tensor=True), para_emb)[0][0].item(), s)
+        for s in sentences
+    ]
+    scored = sorted(scored, reverse=True)
+    return scored[0][1]
+
+def clean_question(text):
+    text = re.sub(r'[<>«»"“”]', '', text)
+    text = re.sub(r'[?,.!;:]+$', '', text)
+    text = text.replace('МА', 'ИИ')
+    text = text.replace('Искусственная разведка', 'Искусственный интеллект')
+    return text.strip().capitalize() + '?'
+
+def clean_statement(text):
+    text = re.sub(r'[<>«»"“”]', '', text)
+    text = re.sub(r'[?,.!;:]+$', '', text)
+    text = text.replace('МА', 'ИИ')
+    text = text.replace('Искусственная разведка', 'Искусственный интеллект')
+    return text.strip().capitalize() + '.'
+
+def generate_questions_from_text(text, *, content_id=None, original_language='ru'):
+    try:
+        lang = detect(text)
+        text_en = translate(text, lang, 'en') if lang != 'en' else text
+        paragraphs = split_into_paragraphs(text_en)
+
+        all_qas = []
+        seen_questions = set()
+
+        def build_prompt(paragraph):
+            key = get_key_sentence(paragraph)
+            return f"context: {paragraph} highlight: {key}"
+
+        prompts = [build_prompt(p) for p in paragraphs]
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            results_per_paragraph = executor.map(generate_questions_from_paragraph, prompts)
+
+        for paragraph, results in zip(paragraphs, results_per_paragraph):
+            for item in results:
+                q = item.get("question", "").strip()
+                raw_answer = item.get("answer", "")
+                a = raw_answer[0] if isinstance(raw_answer, list) else raw_answer
+                a = str(a).strip()
+                distractors = item.get("distractors", [])
+                if not q or not a:
+                    continue
+
+                q_type = classify_question_type(a, distractors)
+
+                if len(q.split()) <= 6 or any(kw in q.lower() for kw in ["какой метод", "что делает", "в каких областях"]):
+                    paraphrased_q = paraphrase_with_context(paragraph, q)
+                else:
+                    paraphrased_q = q
+
+                q_ru = html.unescape(translate(paraphrased_q, src_lang='en', dest_lang=original_language)).strip()
+                a_ru = html.unescape(translate(a, src_lang='en', dest_lang=original_language)).strip()
+                distractors_ru = [html.unescape(translate(d, src_lang='en', dest_lang=original_language).strip()) for d in distractors]
+
+                q_ru = clean_question(q_ru)
+                a_ru = clean_statement(a_ru)
+                distractors_ru = [clean_statement(d) for d in distractors_ru]
+
+                if q_ru in seen_questions or len(set(a_ru.split())) < 3:
+                    continue
+                seen_questions.add(q_ru)
+
+                logger.debug({
+                    'question': q_ru,
+                    'answer': a_ru,
+                    'len_q': len(q_ru.split()),
+                    'len_a': len(a_ru.split()),
+                })
+
+                qa = {
+                    "question": q_ru,
+                    "answer": a_ru,
+                    "question_type": q_type,
+                    "content_id": content_id
+                }
+                if q_type in {"single_choice", "multiple_choice"} and distractors_ru:
+                    qa["distractors"] = distractors_ru
+
+                all_qas.append(qa)
+
+        return cluster_questions(all_qas)
+
+    except Exception as e:
+        logger.error("Ошибка при генерации вопросов:", exc_info=True)
+        return []

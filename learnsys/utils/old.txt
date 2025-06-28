@@ -1,0 +1,322 @@
+# learnsys/utils/question_generation_full.py
+
+import logging
+import traceback
+import nltk
+import html
+nltk.data.path.append('/home/vladdarkstalker/nltk_data')
+from haystack.nodes import QuestionGenerator, FARMReader
+from haystack.pipelines import QuestionAnswerGenerationPipeline
+from haystack.document_stores import InMemoryDocumentStore
+from haystack.schema import Answer
+from langdetect import detect
+from transformers import MarianMTModel, MarianTokenizer
+from sentence_transformers import SentenceTransformer, util
+from sklearn.cluster import DBSCAN
+from razdel import sentenize, tokenize
+from wordfreq import zipf_frequency
+import pymorphy2, re, random
+from .llm_generation import generate_questions_from_paragraph
+
+morph = pymorphy2.MorphAnalyzer()
+logger = logging.getLogger("learnsys")
+
+model_name = 'Helsinki-NLP/opus-mt-en-ru'
+translator_tokenizer = MarianTokenizer.from_pretrained(model_name)
+translator_model = MarianMTModel.from_pretrained(model_name)
+translator_model.eval()
+
+embedding_model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+
+RUS_BAD_RE = re.compile(r'(.)\1\1|\d|(?:[A-ZА-Я]{4,})')
+
+QUESTION_MODELS = [
+    ("iarfmoose/t5-base-question-generator", "baseline"),
+    ("valhalla/t5-small-qg-hl", "highlight"),
+    ("mrm8488/t5-base-finetuned-question-generation-ap", "extended"),
+]
+
+
+def translate(text, src_lang='en', dest_lang='ru'):
+    if src_lang == dest_lang:
+        return text
+    try:
+        inputs = translator_tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+        translated = translator_model.generate(**inputs)
+        return translator_tokenizer.decode(translated[0], skip_special_tokens=True)
+    except Exception as e:
+        logger.error(f"Ошибка при переводе: {e}")
+        return text
+
+def classify_question_type(answer_text, distractors):
+    if distractors:
+        return 'multiple_choice' if len(distractors) >= 2 else 'single_choice'
+    if len(answer_text.split()) <= 3:
+        return 'single_choice'
+    return 'text'
+
+'''
+def classify_question_type(answer_text, distractors):
+    if not distractors:
+        return 'text'
+    correct = answer_text.lower().strip()
+    num_similar = sum(
+        1 for d in distractors
+        if 0.3 < util.cos_sim(
+            embedding_model.encode(correct, convert_to_tensor=True),
+            embedding_model.encode(d.lower(), convert_to_tensor=True)
+        ).item() < 0.9
+    )
+    if num_similar >= 2:
+        return 'multiple_choice'
+    return 'single_choice'
+'''
+
+def sentence_quality(sent, correct_emb, max_len=20):
+    sent = sent.strip()
+    if not sent:
+        return 0.0
+    if re.search(r"\d", sent) or re.search(r"(.)\1\1", sent):
+        return 0.0
+    if len(set(sent.lower().split())) < 3:
+        return 0.0
+    total_len = len(sent)
+    non_alpha = len(re.findall(r"[^A-Za-zА-Яа-я ]", sent))
+    if total_len and non_alpha / total_len > 0.6:
+        return 0.0
+    upper = len(re.findall(r"[A-ZА-Я]", sent))
+    alpha = len(re.findall(r"[A-Za-zА-Яа-я]", sent))
+    if alpha and upper / alpha > 0.7:
+        return 0.0
+    tokens = [t.text for t in tokenize(sent) if t.text.isalpha()]
+    if not (3 <= len(tokens) <= max_len):
+        return 0.0
+    mean_freq = sum(zipf_frequency(w.lower(), 'ru') for w in tokens) / len(tokens)
+    if mean_freq < 3.0:
+        return 0.0
+    emb = embedding_model.encode(sent, convert_to_tensor=True)
+    sim = util.pytorch_cos_sim(emb, correct_emb)[0][0].item()
+    if sim > 0.9:
+        return 0.0
+    has_verb = any('VERB' in morph.parse(w)[0].tag for w in tokens)
+    if not has_verb and len(tokens) < 5:
+        return 0.0
+    bonus = 0.15 if has_verb else 0.0
+    return max(0.0, (1 - sim) + bonus)
+
+
+def cluster_questions(qas, eps=0.5):
+    if not qas:
+        return []
+    embeddings = embedding_model.encode([qa['question'] for qa in qas])
+    labels = DBSCAN(eps=eps, min_samples=1, metric='cosine').fit(embeddings).labels_
+    seen = set()
+    return [qas[i] for i, lbl in enumerate(labels) if lbl not in seen and not seen.add(lbl)]
+
+
+def generate_distractors(correct_answer, distractor_pool, num_distractors=3):
+    correct_emb = embedding_model.encode(correct_answer, convert_to_tensor=True)
+    candidates = [(sentence_quality(s, correct_emb), s) for s in distractor_pool]
+    candidates = [s for score, s in sorted(candidates, reverse=True) if score > 0.3]
+    random.shuffle(candidates)
+    unique = []
+    for c in candidates:
+        norm = c.lower()
+        if norm not in unique:
+            unique.append(norm)
+        if len(unique) >= num_distractors:
+            break
+    return unique
+
+def is_valid_paragraph(p):
+    return (
+        len(p) > 100 and
+        not re.search(r'[♪♫¤≈]|[\*]{4,}|[\-=]{4,}|[КЮЖЩЖ]{4,}', p) and
+        sum(c.isalpha() for c in p) / max(len(p), 1) > 0.4
+    )
+
+def split_paragraphs(text, min_len=50, max_len=250):
+    parts = [p for p in re.split(r'(?<=[.!?])\s+', text) if len(p.strip()) >= min_len]
+    chunks = []
+    chunk = ""
+    for part in parts:
+        if len(chunk) + len(part) < max_len:
+            chunk += " " + part
+        else:
+            if chunk.strip():
+                chunks.append(chunk.strip())
+            chunk = part
+    if chunk.strip():
+        chunks.append(chunk.strip())
+    return chunks
+
+def split_sentences(text, max_len=300):
+    sentences = [s.text.strip() for s in sentenize(text)]
+    chunks = []
+    current = ""
+    for sentence in sentences:
+        if len(current) + len(sentence) < max_len:
+            current += " " + sentence
+        else:
+            if current:
+                chunks.append(current.strip())
+            current = sentence
+    if current:
+        chunks.append(current.strip())
+    return chunks
+
+def split_into_sentences(text):
+    # Простая регулярка для деления текста на предложения
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    return [s.strip() for s in sentences if len(s.strip()) >= 10]
+
+def generate_questions_from_text(text, *, content_id=None, original_language='ru'):
+    try:
+        lang = detect(text)
+        text_en = translate(text, lang, 'en') if lang != 'en' else text
+        sentences = split_into_sentences(text_en)
+
+        all_qas = []
+        seen_questions = set()
+
+        for sentence in sentences:
+            logger.debug(f"[LLM] Обрабатывается предложение: {sentence}")
+            results = generate_questions_from_paragraph(sentence)
+            for item in results:
+                q = item.get("question", "").strip()
+                a = item.get("answer", "").strip()
+                q_type = item.get("type", "text")
+                distractors = item.get("distractors", [])
+
+                if not q or not a:
+                    continue
+
+                # Перевод обратно
+                q_ru = html.unescape(translate(q, src_lang='en', dest_lang=original_language)).strip()
+                a_ru = html.unescape(translate(a, src_lang='en', dest_lang=original_language)).strip()
+                distractors_ru = [html.unescape(translate(d, src_lang='en', dest_lang=original_language).strip()) for d in distractors]
+
+                # Удалим повторы и мусор
+                if len(set(a_ru.split())) < 3 or q_ru in seen_questions:
+                    continue
+                seen_questions.add(q_ru)
+
+                qa = {
+                    "question": q_ru,
+                    "answer": a_ru,
+                    "question_type": q_type,
+                    "content_id": content_id
+                }
+                if q_type in {"single_choice", "multiple_choice"} and distractors_ru:
+                    qa["distractors"] = distractors_ru
+
+                all_qas.append(qa)
+
+        logger.debug(f"[LLM] Результат генерации: {all_qas}")
+        return all_qas
+
+    except Exception as e:
+        logger.error("Ошибка при генерации вопросов:", exc_info=True)
+        return []
+
+'''
+def generate_questions_from_text(text, *, content_id=None, original_language='ru'):
+    import html
+    logger.debug(f"[LLM] Генерация вопросов по тексту длиной {len(text)} символов")
+
+    def is_valid_paragraph(p):
+        return (
+            len(p) > 100 and
+            not re.search(r'[♪♫¤≈]|[\*]{4,}|[\-=]{4,}|[КЮЖЩЖ]{4,}', p) and
+            sum(c.isalpha() for c in p) / max(len(p), 1) > 0.4
+        )
+
+    try:
+        lang = detect(text)
+        text_ru = translate(text, lang, 'ru') if lang != 'ru' else text
+
+        paragraphs = [p.strip() for p in text_ru.split('\n\n') if is_valid_paragraph(p.strip())]
+
+        all_qas = []
+        seen_questions = []
+
+        for para in paragraphs:
+            results = generate_questions_from_paragraph(para)
+            for item in results:
+                question_en = item.get("question", "").strip()
+                q_type = item.get("type", "text").strip()
+
+                answer_en_raw = item.get("answer", "")
+                answer_en = (
+                    answer_en_raw[0] if isinstance(answer_en_raw, list) else answer_en_raw
+                ).strip()
+
+                distractors_en = item.get("distractors", [])
+
+                question = html.unescape(translate(question_en, src_lang='en', dest_lang=original_language).strip().strip('"“”'))
+                question = re.sub(r'^[-–—>\s]+', '', question)
+
+                answer = html.unescape(translate(answer_en.strip(), src_lang='en', dest_lang=original_language))
+                distractors = [html.unescape(translate(d, src_lang='en', dest_lang=original_language).strip()) for d in distractors_en]
+
+                try:
+                    if detect(answer) == 'en':
+                        answer = html.unescape(translate(answer_en, src_lang='en', dest_lang=original_language))
+                except:
+                    pass
+
+                if not question or not answer:
+                    continue
+                if len(set(answer.split())) < 3:
+                    continue
+                if any(w in answer.lower() for w in ['ладно', 'ээ', 'не знаю', 'домашние']):
+                    continue
+                if re.search(r'(различн|обладает потенциалом|используется в)', answer.lower()):
+                    continue
+                if re.search(r'[♪♫¤≈]', question + answer):
+                    continue
+                if len(set(answer.lower().split())) <= 2:
+                    continue
+                if answer.split().count(answer.split()[0]) > 5:
+                    continue
+                if any(sym in answer for sym in ['(', ')', '=', '/', '*']) or len(answer) < 5:
+                    continue
+                if re.search(r'\b(на\s+на|дом\s+дом|огр\s+огр)\b', answer.lower()):
+                    continue
+                if re.search(r'[А-Я]{2,}', answer):
+                    continue
+                if re.search(r'[a-zA-Z]{3,}.*[а-яА-Я]{3,}|[а-яА-Я]{3,}.*[a-zA-Z]{3,}', answer):
+                    continue
+                if re.search(r'(.)\1{2,}', answer.lower()) or re.search(r'opo\s+yr', answer.lower()):
+                    continue
+
+                q_emb = embedding_model.encode(question, convert_to_tensor=True)
+                a_emb = embedding_model.encode(answer, convert_to_tensor=True)
+                en_emb = embedding_model.encode(answer_en, convert_to_tensor=True)
+
+                sim_score = util.pytorch_cos_sim(q_emb, a_emb)[0][0].item()
+                trans_score = util.pytorch_cos_sim(a_emb, en_emb)[0][0].item()
+
+                if sim_score < 0.15 or trans_score < 0.25:
+                    answer = html.unescape(translate(answer_en, src_lang='en', dest_lang=original_language))
+
+                if any(util.pytorch_cos_sim(q_emb, embedding_model.encode(prev_q, convert_to_tensor=True))[0][0].item() > 0.9 for prev_q in seen_questions):
+                    continue
+                seen_questions.append(question)
+
+                qa = {
+                    "question": question,
+                    "answer": answer,
+                    "question_type": q_type,
+                    "content_id": content_id
+                }
+                if q_type in {"single_choice", "multiple_choice"} and distractors:
+                    qa["distractors"] = distractors
+                all_qas.append(qa)
+
+        return all_qas
+
+    except Exception as e:
+        logger.error("Ошибка при генерации вопросов с помощью LLM:", exc_info=True)
+        return []
+'''

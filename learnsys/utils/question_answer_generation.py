@@ -21,8 +21,11 @@ logger = logging.getLogger(__name__)
 translator = Translator()
 
 # Модель для генерации вопросов
-tokenizer_qg = AutoTokenizer.from_pretrained("mrm8488/t5-base-finetuned-question-generation-ap")
-model_qg = AutoModelForSeq2SeqLM.from_pretrained("mrm8488/t5-base-finetuned-question-generation-ap")
+#tokenizer_qg = AutoTokenizer.from_pretrained("mrm8488/t5-base-finetuned-question-generation-ap")
+#model_qg = AutoModelForSeq2SeqLM.from_pretrained("mrm8488/t5-base-finetuned-question-generation-ap")
+tokenizer_qg = AutoTokenizer.from_pretrained("valhalla/t5-small-qg-hl", use_fast=False)
+model_qg = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qg-hl")
+
 
 # Модель для вопросно-ответной системы
 tokenizer_qa = AutoTokenizer.from_pretrained("deepset/roberta-base-squad2")

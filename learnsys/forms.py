@@ -86,6 +86,10 @@ class ManageTestRetakesForm(forms.Form):
 
         # Фильтрация студентов: только те, кто уже проходил тест, но не имеет активного разрешения на повторное прохождение
         if test:
+<<<<<<< Updated upstream
+=======
+            # Показываем только тех, кто уже сдавал этот тест
+>>>>>>> Stashed changes
             self.fields['students'].queryset = User.objects.filter(
                 testresult__test=test
             ).exclude(
@@ -342,3 +346,19 @@ class GroupMemberForm(forms.ModelForm):
         if user and GroupMember.objects.filter(user=user).exists():
             self.add_error('user', 'Этот студент уже состоит в другой группе.')
         return cleaned_data
+<<<<<<< Updated upstream
+=======
+
+class PsychTestForm(forms.Form):
+    def __init__(self, *args, **kwargs):
+        questions = kwargs.pop('questions')
+        super().__init__(*args, **kwargs)
+        for question in questions:
+            choices = [(answer.id, answer.text) for answer in question.answers.all()]
+            self.fields[f'question_{question.id}'] = forms.ChoiceField(
+                label=question.text,
+                choices=choices,
+                widget=forms.RadioSelect,
+                required=True
+            )
+>>>>>>> Stashed changes

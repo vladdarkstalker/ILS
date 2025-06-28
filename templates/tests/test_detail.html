@@ -1,8 +1,6 @@
 <!-- templates/tests/test_detail.html -->
 
 {% extends 'base.html' %}
-{% load custom_filters %}
-
 {% block title %}{{ test.title }}{% endblock %}
 
 {% block content %}
@@ -11,13 +9,82 @@
 
 <!-- Раздел для инструкторов -->
 {% if is_instructor %}
+<<<<<<< Updated upstream
     <div class="mb-3">
         <a href="{% url 'learnsys:manage_test_retakes' test_id=test.id %}" class="btn btn-info">Управление повторными прохождениями теста</a>
         <a href="{% url 'learnsys:testitem_add' test.id %}" class="btn btn-success">Добавить вопрос</a>
         <a href="{% url 'learnsys:test_update' pk=test.id %}" class="btn btn-warning">Редактировать тест</a>
         <a href="{% url 'learnsys:test_delete' pk=test.id %}" class="btn btn-danger">Удалить тест</a>
-    </div>
+=======
+<form method="post" action="{% url 'learnsys:generate_questions' pk=test.id %}" class="mb-3">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-secondary">Сгенерировать вопросы для теста</button>
+</form>
 
+<div class="mb-3">
+    <a href="{% url 'learnsys:testitem_add' test.id %}" class="btn btn-success">Добавить вопрос</a>
+    <a href="{% url 'learnsys:test_update' pk=test.id %}" class="btn btn-warning">Редактировать тест</a>
+    <a href="{% url 'learnsys:test_delete' pk=test.id %}" class="btn btn-danger">Удалить тест</a>
+</div>
+
+<h4 class="mt-4">Всего прохождений: {{ total_test_results }}</h4>
+
+{% for q in question_forms %}
+<form method="post" action="{% url 'learnsys:testitem_edit' pk=q.form.instance.id %}">
+    {% csrf_token %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Вопрос {{ forloop.counter }}</h5>
+
+            {{ q.form.as_p }}
+
+            {% if q.form.instance.question_type != 'text' %}
+                <ul class="mt-2">
+                    {% for opt in q.form.instance.options.all %}
+                    <li>
+                        {{ opt.content }}
+                        {% if opt.is_correct %}
+                            <span class="badge badge-success">✓</span>
+                        {% endif %}
+                        <a href="{% url 'learnsys:testitemoption_edit' pk=opt.id %}" class="btn btn-sm btn-outline-primary">Ред.</a>
+                        <a href="{% url 'learnsys:testitemoption_delete' pk=opt.id %}" class="btn btn-sm btn-outline-danger">Удал.</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <a href="{% url 'learnsys:testitemoption_add' q.form.instance.id %}" class="btn btn-sm btn-outline-success mt-2">Добавить вариант ответа</a>
+            {% endif %}
+
+            <div class="table-responsive mt-3">
+                <table class="table table-sm table-bordered text-center">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>a</th><th>b</th><th>c</th><th>P(θ=0)</th><th>Эмпирическая P</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ q.irt.a|floatformat:3 }}</td>
+                            <td>{{ q.irt.b|floatformat:3 }}</td>
+                            <td>{{ q.irt.c|floatformat:3 }}</td>
+                            <td>{{ q.irt.model_p|floatformat:3 }}</td>
+                            <td>{{ q.irt.empirical_p|floatformat:3 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex justify-content-between mt-3">
+                <a href="{% url 'learnsys:testitem_delete' pk=q.form.instance.id %}" class="btn btn-sm btn-outline-danger"
+                   onclick="return confirm('Удалить этот вопрос?');">Удалить вопрос</a>
+                <button type="submit" class="btn btn-sm btn-primary">Сохранить</button>
+            </div>
+        </div>
+>>>>>>> Stashed changes
+    </div>
+</form>
+{% endfor %}
+
+<<<<<<< Updated upstream
     <!-- Отображение всех вопросов для инструктора -->
     <ul class="list-group">
         {% for item in test_items %}
@@ -68,10 +135,18 @@
         <div class="alert alert-info mt-3">
             <p>Вы уже прошли этот тест.</p>
             <p>Ваш результат: {{ test_result.score }}/{{ test_result.total_questions }}</p>
+=======
+{% else %}
+    {% if can_take_test %}
+        <a href="{% url 'learnsys:adaptive_test' test.id %}" class="btn btn-primary">Начать тест</a>
+    {% elif test_result %}
+        <div class="alert alert-info mt-3">
+            <p>Вы уже прошли этот тест. Результат: {{ test_result.score }}/{{ test_result.total_questions }}</p>
+>>>>>>> Stashed changes
             {% if test.allow_retakes %}
                 <form method="post" action="{% url 'learnsys:take_test_again' test.id %}">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-secondary">Пройти тест снова</button>
+                    <button type="submit" class="btn btn-secondary">Пройти снова</button>
                 </form>
             {% endif %}
         </div>
@@ -79,4 +154,29 @@
         <p>Вы уже прошли этот тест. Повторное прохождение запрещено.</p>
     {% endif %}
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    function updateVisibility(selectEl) {
+        const prefix = selectEl.id.replace('-question_type', '');
+        const answerFieldGroup = document.getElementById(prefix + '-correct_text_answer')?.closest('.form-group');
+        if (!answerFieldGroup) return;
+
+        if (selectEl.value === "text") {
+            answerFieldGroup.style.display = "block";
+        } else {
+            answerFieldGroup.style.display = "none";
+        }
+    }
+
+    document.querySelectorAll('[id$="-question_type"]').forEach(function (selectEl) {
+        updateVisibility(selectEl);
+        selectEl.addEventListener('change', function () {
+            updateVisibility(selectEl);
+        });
+    });
+});
+</script>
 {% endblock %}

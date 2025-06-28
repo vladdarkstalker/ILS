@@ -1,18 +1,21 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Дашборд студента{% endblock %}
 
 {% block content %}
 <h2>Добро пожаловать, {{ user.get_full_name }}!</h2>
 
-<h3>Ваши курсы</h3>
+<!-- Проверяем, есть ли у студента курсы -->
 {% if course_stats %}
     <div class="row">
         {% for stat in course_stats %}
-            <div class="col-md-4">
-                <div class="card mb-4">
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
                     <div class="card-body">
+                        <!-- Название и описание курса -->
                         <h5 class="card-title">{{ stat.course.name }}</h5>
+<<<<<<< Updated upstream
                         <p class="card-text">{{ stat.course.description|truncatewords:20 }}</p>
                         
                         <!-- Отображение прогресса курса -->
@@ -28,18 +31,75 @@
             {% endif %}
         </p>
     </div>
+=======
+>>>>>>> Stashed changes
                         <p class="card-text">
-                            Завершено тем: {{ stat.completed_topics }} из {{ stat.total_topics }}
+                            {{ stat.course.description|truncatewords:25 }}
+                        </p>
+
+                        <!-- Проверяем, завершён ли весь курс, или в процессе -->
+                        {% if stat.progress_percentage == 100 %}
+                            <span class="badge badge-success">Курс завершён</span>
+                        {% elif stat.progress_percentage > 0 %}
+                            <span class="badge badge-info">Курс в процессе</span>
+                        {% else %}
+                            <span class="badge badge-secondary">Курс не начат</span>
+                        {% endif %}
+
+                        <!-- Общий прогресс -->
+                        <p class="mt-2">
+                            Прогресс по курсу: <strong>{{ stat.progress_percentage }}%</strong><br>
+                            Завершено тем: {{ stat.completed_topics }}/{{ stat.total_topics }}
                         </p>
                         
-                        <!-- Кнопка перехода к деталям курса -->
-                        <a href="{% url 'learnsys:course_detail' stat.course.id %}" class="btn btn-primary">Перейти к курсу</a>
+                        <!-- Средний результат по всем тестам в курсе -->
+                        <p>
+                            Средний результат по тестам: <strong>{{ stat.average_score_percent }}%</strong><br>
+                            Оценка (5-балльная): <strong>{{ stat.grade_5scale }}</strong>
+                        </p>
+                        
+                        <!-- Детализация по темам -->
+                        <hr>
+                        <h6>Темы в этом курсе:</h6>
+                        <ul style="list-style-type:none; padding:0;">
+                            {% for tprog in stat.topic_progresses %}
+                                <li style="margin-bottom: 8px;">
+                                    <strong>{{ tprog.topic.name }}</strong> — 
+                                    {% if tprog.status == 'completed' %}
+                                        <span class="badge badge-success">Завершена</span>
+                                    {% elif tprog.status == 'in_progress' %}
+                                        <span class="badge badge-warning">В процессе</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Не начато</span>
+                                    {% endif %}
+                                    
+                                    {% if tprog.score_percentage %}
+                                        <span class="ml-2">(результат: {{ tprog.score_percentage|floatformat:1 }}%)</span>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="card-footer text-right">
+                        <!-- Кнопка для перехода на детальную страницу курса -->
+                        <a href="{% url 'learnsys:course_detail' stat.course.id %}" class="btn btn-primary">
+                            Перейти к курсу
+                        </a>
                     </div>
                 </div>
             </div>
         {% endfor %}
     </div>
+
 {% else %}
     <p>Вы еще не записаны ни на один курс.</p>
 {% endif %}
+
+<!-- Дополнительный блок: Психологические тесты (опционально) -->
+<h2>Психологические тестирования</h2>
+<p>Пройдите психологические тесты, чтобы узнать больше о своих личностных характеристиках.</p>
+<ul>
+    <li><a href="{% url 'learnsys:psych_test_list' %}">Просмотреть доступные тесты</a></li>
+    <li><a href="{% url 'learnsys:psych_test_results' %}">Просмотреть результаты тестирований</a></li>
+</ul>
 {% endblock %}

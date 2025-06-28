@@ -25,8 +25,11 @@ SECRET_KEY = 'django-insecure-8@iu=rvjd%in(7u@0y^=gmoj_!mfv!r@uc7h2hn12d%x1^6bz$
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+<<<<<<< Updated upstream
 ALLOWED_HOSTS = []
 
+=======
+>>>>>>> Stashed changes
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'learnsys.authentication_backends.CustomAuthBackend',
@@ -177,3 +180,87 @@ LOGGING = {
     },
 }
 
+<<<<<<< Updated upstream
+=======
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+>>>>>>> Stashed changes

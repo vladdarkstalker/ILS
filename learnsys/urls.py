@@ -5,6 +5,8 @@ from django.contrib.auth import views as auth_views
 from . import views
 from django.conf import settings
 from django.conf.urls.static import static
+from .views import export_psych_test_csv
+from .views import GenerateTestView, GenerateQuestionsView
 
 app_name = 'learnsys'  # Пространство имён приложения
 
@@ -84,4 +86,23 @@ urlpatterns = [
 
     path('topics/<int:pk>/generate_questions/', views.GenerateQuestionsView.as_view(), name='generate_questions'),
 
+<<<<<<< Updated upstream
+=======
+    # Психтесты
+    path('psych_tests/', views.psych_test_list, name='psych_test_list'),
+    path('psych_tests/<int:test_id>/', views.psych_take_test, name='psych_take_test'),
+    path('psych_tests/<int:test_id>/result/', views.psych_test_results, name='psych_test_result'),
+    path('psych_tests/results/', views.all_test_results, name='psych_test_results'),
+    path('psych/<int:test_id>/export_csv/', export_psych_test_csv, name='export_psych_test_csv'),
+
+    path('topics/<int:pk>/generate_questions/', views.GenerateQuestionsView.as_view(), name='generate_questions'),
+
+    path('tests/<int:pk>/generate_one/', views.generate_single_question, name='generate_single_question'),
+    path('tests/<int:pk>/generate_more/', views.AppendGeneratedQuestionsView.as_view(), name='generate_more_questions'),
+    path('tests/<int:pk>/generate_questions/', views.GenerateQuestionsView.as_view(), name='generate_questions'),
+
+    path('topics/<int:pk>/generate_test/', GenerateTestView.as_view(), name='generate_test'),
+    path('topics/<int:pk>/generate_questions/', GenerateQuestionsView.as_view(), name='generate_questions'),
+
+>>>>>>> Stashed changes
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

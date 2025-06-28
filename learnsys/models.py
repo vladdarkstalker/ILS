@@ -1,11 +1,13 @@
-# models.py
-
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.text import Truncator
 from django.core.exceptions import ValidationError
 from django.conf import settings
 from django.utils import timezone
+<<<<<<< Updated upstream
+=======
+import math
+>>>>>>> Stashed changes
 
 class User(AbstractUser):
     surname = models.CharField("Фамилия", max_length=255, blank=True)
@@ -25,6 +27,9 @@ class Course(models.Model):
     name = models.CharField("Название курса", max_length=255, unique=True)
     description = models.TextField("Описание")
     instructor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='courses')
+
+    def __str__(self):
+        return self.name
 
     def calculate_progress(self, user):
         total_topics = self.topics.count()
@@ -283,6 +288,12 @@ class TopicProgress(models.Model):
         self.test_completed = True
         self.correct_answers = correct
         self.total_questions = total
+
+        if total > 0 and (correct / total) >= 0.5:
+            self.status = 'completed'
+        else:
+            self.status = 'in_progress'
+
         self.save()
 
     def test_score_percentage(self):
@@ -312,4 +323,73 @@ class TestRetakePermission(models.Model):
 
     def __str__(self):
         status = "Разрешено" if self.allowed else "Запрещено"
+<<<<<<< Updated upstream
         return f"{self.user.get_full_name()} - {self.test.title}: {status}"
+=======
+        return f"{self.user.get_full_name()} - {self.test.title}: {status}"
+
+class AdaptiveTestSession(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="Пользователь")
+    test = models.ForeignKey(Test, on_delete=models.CASCADE, verbose_name="Тест")
+    theta = models.FloatField("Оценка способности", default=0.0)
+    asked_items = models.ManyToManyField('TestItem', blank=True, verbose_name="Заданные вопросы")
+    finished = models.BooleanField("Завершено", default=False)
+    date_started = models.DateTimeField("Дата начала", auto_now_add=True)
+    current_complexity = models.CharField(
+        "Текущая сложность",
+        max_length=10,
+        choices=[('easy','Легкий'),('medium','Средний'),('hard','Сложный')],
+        default='medium'
+    )
+
+    class Meta:
+        unique_together = ('user', 'test')
+
+    def __str__(self):
+        return f"Adaptive session: {self.user} - {self.test}"
+
+    def reset_for_retake(self):
+        # Очищаем попытку для повторного прохождения: удаляем ответы, сбрасываем θ
+        self.asked_items.clear()
+        self.theta = 0.0
+        self.finished = False
+        self.current_complexity = 'medium'
+        # Удаляем старые ответы пользователя по этому тесту:
+        UserTestAnswer.objects.filter(user=self.user, item__test=self.test).delete()
+        self.save()
+
+class PsychTest(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True)
+
+class PsychQuestion(models.Model):
+    test = models.ForeignKey(PsychTest, on_delete=models.CASCADE, related_name='questions')
+    text = models.TextField()
+    factor = models.CharField(max_length=2)  # Например, A, B, C, D...
+
+class PsychAnswer(models.Model):
+    question = models.ForeignKey(PsychQuestion, on_delete=models.CASCADE, related_name='answers')
+    text = models.TextField()
+    score = models.IntegerField()
+
+class PsychTestResult(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='test_results')
+    test = models.ForeignKey(PsychTest, on_delete=models.CASCADE, related_name='results')
+    factor = models.CharField(max_length=2)
+    result = models.FloatField()
+    date_taken = models.DateTimeField(auto_now_add=True)
+
+class FactorInterpretation(models.Model):
+    factor_code = models.CharField(max_length=10, unique=True)
+    factor_name = models.CharField(max_length=100)
+    value_interpretations = models.JSONField(default=dict)
+
+    def get_interpretation(self, value):
+        """Возвращает интерпретацию психологического фактора по значению."""
+        for interpretation in self.value_interpretations:
+            min_value = interpretation['min_value']
+            max_value = interpretation['max_value']
+            if min_value <= value <= max_value:
+                return interpretation['text']
+        return "Интерпретация не найдена"
+>>>>>>> Stashed changes
