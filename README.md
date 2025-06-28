@@ -126,3 +126,6 @@ chmod +x start_ngrok_server.sh
 
 * Остановка Django-сервера: `Ctrl+C`
 * Деактивация виртуального окружения: `deactivate`
+
+## Полезные ссылки
+* [Latex исходники](https://gitflic.ru/project/oami/nir-4-ist)
